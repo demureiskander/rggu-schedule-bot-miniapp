@@ -1,7 +1,7 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
 import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js';
-import { formOptions, COURSES, MASCOT, GROUP_FORMS, formatFormCode } from './constants.js';
+import { formOptions, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js';
 import { APP_VERSION, BOT_USERNAME } from '../config.js';
 import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js';
 import { applyTheme } from './theme.js';
@@ -114,13 +114,19 @@ export function renderWelcome(mount, _params, router) {
 }
 
 // =========================================================
-// 6.2 Выбор группы: форма → курс → поиск (каждый шаг — кадр стека)
+// 6.2 Выбор группы: форма → курс → институт → направление → группа
+// Каждый шаг — отдельный кадр стека (BackButton листает шаги назад).
+// Список групп грузится один раз на форму+курс и кэшируется на сессию.
 // =========================================================
+const flowsCache = new Map(); // `${form}:${course}` -> flows[]
+
 export function renderPicker(mount, params, router) {
   const step = params.step || 'form';
   if (step === 'form') return renderPickerForm(mount, params, router);
   if (step === 'course') return renderPickerCourse(mount, params, router);
-  return renderPickerSearch(mount, params, router);
+  if (step === 'institute') return renderPickerInstitute(mount, params, router);
+  if (step === 'direction') return renderPickerDirection(mount, params, router);
+  return renderPickerGroup(mount, params, router);
 }
 
 function pickerHeader(title, subtitle) {
@@ -134,7 +140,7 @@ function pickerHeader(title, subtitle) {
 
 function renderPickerForm(mount, params, router) {
   const screen = h('<section class="picker stack"></section>');
-  screen.appendChild(pickerHeader('Форма обучения', 'Шаг 1 из 3'));
+  screen.appendChild(pickerHeader('Форма обучения'));
   const list = h('<div class="option-list"></div>');
   for (const f of formOptions()) {
     const item = h(`
@@ -155,13 +161,13 @@ function renderPickerForm(mount, params, router) {
 function renderPickerCourse(mount, params, router) {
   const screen = h('<section class="picker stack"></section>');
   const formLabel = formatFormCode(GROUP_FORMS[params.form] || '');
-  screen.appendChild(pickerHeader('Курс', `${formLabel} · Шаг 2 из 3`));
+  screen.appendChild(pickerHeader('Курс', formLabel));
   const grid = h('<div class="course-grid"></div>');
   for (const c of COURSES) {
     const item = h(`<button class="course-chip">${c} курс</button>`);
     item.addEventListener('click', () => {
       hapticSelection();
-      router.navigate('picker', { step: 'search', form: params.form, course: c });
+      router.navigate('picker', { step: 'institute', form: params.form, course: c });
     });
     grid.appendChild(item);
   }
@@ -169,21 +175,29 @@ function renderPickerCourse(mount, params, router) {
   mount.appendChild(screen);
 }
 
-function renderPickerSearch(mount, params, router) {
-  const screen = h('<section class="picker stack"></section>');
-  const formLabel = formatFormCode(GROUP_FORMS[params.form] || '');
-  screen.appendChild(pickerHeader('Твоя группа', `${formLabel} · ${params.course} курс`));
-  const body = h('<div class="picker-body"></div>');
-  screen.appendChild(body);
-  mount.appendChild(screen);
+// Сохраняет выбранную группу и переходит на расписание.
+async function commitGroup(params, flow, router) {
+  haptic('light');
+  const group = {
+    form: params.form, year: params.course,
+    id: flow.id, name: flow.name, details: flow.details,
+  };
+  await set('group', group);
+  router.reset('schedule', { group });
+}
 
-  loadGroups();
-
-  async function loadGroups() {
+// Загружает группы (с кэшем) и зовёт onReady(flows) / показывает загрузку/ошибку/пусто.
+function withFlows(body, params, router, onReady) {
+  const key = `${params.form}:${params.course}`;
+  const run = async () => {
     body.innerHTML = '';
-    body.appendChild(mascotBlock({ pose: 'think', title: 'Ищу группы…', spinner: true }));
+    body.appendChild(mascotBlock({ pose: 'think', title: 'Загружаю…', spinner: true }));
     try {
-      const flows = await fetchFlows(params.form, params.course);
+      let flows = flowsCache.get(key);
+      if (!flows) {
+        flows = await fetchFlows(params.form, params.course);
+        flowsCache.set(key, flows);
+      }
       if (!flows.length) {
         body.innerHTML = '';
         body.appendChild(mascotBlock({
@@ -194,35 +208,63 @@ function renderPickerSearch(mount, params, router) {
         }));
         return;
       }
-      renderGroupList(flows);
+      body.innerHTML = '';
+      onReady(flows);
     } catch (_) {
       body.innerHTML = '';
       body.appendChild(mascotBlock({
         pose: 'sad',
         title: 'Не получилось загрузить',
         subtitle: 'Похоже, пропала связь. Давай попробуем ещё раз.',
-        actions: [{ label: 'Попробовать снова', onClick: loadGroups }],
+        actions: [{ label: 'Попробовать снова', onClick: run }],
       }));
     }
-  }
+  };
+  run();
+}
 
-  function renderGroupList(flows) {
-    body.innerHTML = '';
+// Шаг 3 — институт.
+function renderPickerInstitute(mount, params, router) {
+  const screen = h('<section class="picker stack"></section>');
+  const formLabel = formatFormCode(GROUP_FORMS[params.form] || '');
+  screen.appendChild(pickerHeader('Институт', `${formLabel} · ${params.course} курс`));
+  const body = h('<div class="picker-body"></div>');
+  screen.appendChild(body);
+  mount.appendChild(screen);
+
+  withFlows(body, params, router, (flows) => {
+    // Поиск по всем группам формы+курса (минуя дерево). Пусто — показываем дерево.
     const search = h(`<input class="search-input" type="search" inputmode="search"
-      placeholder="Поиск по названию или направлению" aria-label="Поиск группы" />`);
+      placeholder="Знаешь группу? Найди по названию" aria-label="Поиск группы" />`);
     const list = h('<div class="option-list"></div>');
     body.appendChild(search);
     body.appendChild(list);
 
-    const draw = (q = '') => {
-      const needle = q.trim().toLowerCase();
+    const drawTree = () => {
+      list.innerHTML = '';
+      for (const inst of buildTree(flows)) {
+        const count = [...inst.dirs.values()].reduce((s, a) => s + a.length, 0);
+        const item = h(`
+          <button class="option-row">
+            <span class="option-row__label">${esc(inst.name)}</span>
+            <span class="option-row__sub">${inst.dirs.size} напр. · ${count} групп</span>
+          </button>
+        `);
+        item.addEventListener('click', () => {
+          hapticSelection();
+          router.navigate('picker', { ...params, step: 'direction', inst: inst.name });
+        });
+        list.appendChild(item);
+      }
+    };
+
+    const drawSearch = (needle) => {
+      list.innerHTML = '';
       const shown = flows.filter((f) =>
-        !needle ||
         f.name.toLowerCase().includes(needle) ||
         f.details.toLowerCase().includes(needle));
-      list.innerHTML = '';
       if (!shown.length) {
-        list.appendChild(h('<p class="muted" style="padding:16px 4px">Ничего не нашлось — попробуй иначе.</p>'));
+        list.appendChild(h('<p class="muted" style="padding:16px 4px">Ничего не нашлось — попробуй иначе или выбери деревом.</p>'));
         return;
       }
       for (const f of shown) {
@@ -232,23 +274,74 @@ function renderPickerSearch(mount, params, router) {
             ${f.details ? `<span class="option-row__sub">${esc(f.details)}</span>` : ''}
           </button>
         `);
-        item.addEventListener('click', () => pickGroup(f));
+        item.addEventListener('click', () => commitGroup(params, f, router));
         list.appendChild(item);
       }
     };
-    search.addEventListener('input', () => draw(search.value));
-    draw();
-  }
 
-  async function pickGroup(flow) {
-    haptic('light');
-    const group = {
-      form: params.form, year: params.course,
-      id: flow.id, name: flow.name, details: flow.details,
-    };
-    await set('group', group);
-    router.reset('schedule', { group });
-  }
+    search.addEventListener('input', () => {
+      const needle = search.value.trim().toLowerCase();
+      if (needle) drawSearch(needle); else drawTree();
+    });
+    drawTree();
+  });
+}
+
+// Шаг 4 — направление.
+function renderPickerDirection(mount, params, router) {
+  const screen = h('<section class="picker stack"></section>');
+  screen.appendChild(pickerHeader('Направление', params.inst));
+  const body = h('<div class="picker-body"></div>');
+  screen.appendChild(body);
+  mount.appendChild(screen);
+
+  withFlows(body, params, router, (flows) => {
+    const inst = buildTree(flows).find((i) => i.name === params.inst);
+    const dirs = inst ? [...inst.dirs.keys()].sort((a, b) => a.localeCompare(b, 'ru')) : [];
+    const list = h('<div class="option-list"></div>');
+    for (const dir of dirs) {
+      const n = inst.dirs.get(dir).length;
+      const item = h(`
+        <button class="option-row">
+          <span class="option-row__label">${esc(dir)}</span>
+          <span class="option-row__sub">${n} ${n === 1 ? 'группа' : 'групп'}</span>
+        </button>
+      `);
+      item.addEventListener('click', () => {
+        hapticSelection();
+        router.navigate('picker', { ...params, step: 'group', dir });
+      });
+      list.appendChild(item);
+    }
+    body.appendChild(list);
+  });
+}
+
+// Шаг 5 — группа (профиль показываем подписью).
+function renderPickerGroup(mount, params, router) {
+  const screen = h('<section class="picker stack"></section>');
+  screen.appendChild(pickerHeader('Группа', params.dir));
+  const body = h('<div class="picker-body"></div>');
+  screen.appendChild(body);
+  mount.appendChild(screen);
+
+  withFlows(body, params, router, (flows) => {
+    const inst = buildTree(flows).find((i) => i.name === params.inst);
+    const groups = (inst && inst.dirs.get(params.dir)) || [];
+    const list = h('<div class="option-list"></div>');
+    for (const f of groups) {
+      const { profile } = splitDetails(f.details);
+      const item = h(`
+        <button class="option-row">
+          <span class="option-row__label">${esc(f.name)}</span>
+          ${profile ? `<span class="option-row__sub">${esc(profile)}</span>` : ''}
+        </button>
+      `);
+      item.addEventListener('click', () => commitGroup(params, f, router));
+      list.appendChild(item);
+    }
+    body.appendChild(list);
+  });
 }
 
 // =========================================================

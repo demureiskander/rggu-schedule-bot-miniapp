@@ -67,6 +67,66 @@ export function formOptions() {
 // Курсы для выбора.
 export const COURSES = [1, 2, 3, 4, 5, 6];
 
+// Словарь институтов: аббревиатура (name.split('-')[0]) → полное название.
+// Нерасшифрованные аббревиатуры показываем как есть (фолбэк), см. instituteName().
+export const INSTITUTES = {
+  ИАИ:    'Историко-архивный институт',
+  ИЭУП:   'Институт экономики, управления и права',
+  ИСЭН:   'Институт социально-экономических наук',
+  ИП:     'Институт психологии им. Л.С. Выготского',
+  ФИИ:    'Факультет истории искусства',
+  ИФИ:    'Институт филологии и истории',
+  ФРиСО:  'Факультет маркетинга и рекламы',
+  ФРИСО:  'Факультет маркетинга и рекламы',
+  ИПр:    'Институт правоведения',
+  ФК:     'Факультет культурологии',
+  ИЛ:     'Институт лингвистики',
+  ИВКА:   'Институт восточных культур и античности',
+  ИИНиТБ: 'Институт информационных наук и технологий безопасности',
+  СФ:     'Социологический факультет',
+  ФФ:     'Философский факультет',
+  ИМОиПН: 'Институт международных отношений и политических наук',
+  ИИРиДК: 'Институт истории религий и духовной культуры',
+  ОИСвГС: 'Отделение интеллектуальных систем в гуманитарной сфере',
+};
+
+// Аббревиатура института из кода группы (name = "ИАИ-ФАД-ДА-... (Группа: 1)").
+export function instituteAbbr(name) {
+  return (name || '').split('-')[0] || '—';
+}
+
+// Полное название института или сама аббревиатура (фолбэк) + флаг расшифровки.
+export function instituteName(abbr) {
+  const resolved = Object.prototype.hasOwnProperty.call(INSTITUTES, abbr);
+  return { name: resolved ? INSTITUTES[abbr] : abbr, resolved };
+}
+
+// Направление и профиль из details ("Направление › Профиль").
+export function splitDetails(details) {
+  const [direction = '', profile = ''] = (details || '').split(' › ');
+  return { direction: direction.trim(), profile: profile.trim() };
+}
+
+// Дерево из плоского списка групп: институт → направление → [группы].
+// Институты слиты по полному названию (ФРиСО/ФРИСО → одна ветка), отсортированы
+// по алфавиту названия; нерасшифрованные (фолбэк) — в конце.
+export function buildTree(flows) {
+  const byInst = new Map(); // displayName -> { name, resolved, dirs: Map(dir -> flows[]) }
+  for (const f of flows) {
+    const { name, resolved } = instituteName(instituteAbbr(f.name));
+    if (!byInst.has(name)) byInst.set(name, { name, resolved, dirs: new Map() });
+    const inst = byInst.get(name);
+    const { direction } = splitDetails(f.details);
+    const dir = direction || 'Без направления';
+    if (!inst.dirs.has(dir)) inst.dirs.set(dir, []);
+    inst.dirs.get(dir).push(f);
+  }
+  return [...byInst.values()].sort((a, b) => {
+    if (a.resolved !== b.resolved) return a.resolved ? -1 : 1;
+    return a.name.localeCompare(b.name, 'ru');
+  });
+}
+
 // Дни недели (короткие) для полоски дней и заголовков.
 export const WEEKDAYS_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 export const WEEKDAYS_FULL = [
