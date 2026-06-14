@@ -311,6 +311,20 @@ h2 { font-size: 20px; }
   min-height: 44px;
 }
 .icon-btn { color: var(--text-dim); }
+.sched-top__right { display: flex; align-items: center; gap: var(--sp-2); }
+.today-btn {
+  min-height: 32px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--amber);
+  border-radius: var(--r-btn);
+  background: transparent;
+  color: var(--amber);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.today-btn:active { background: rgba(245, 158, 11, 0.12); }
 
 .weather { display: flex; align-items: center; gap: 5px; }
 .weather__icon { font-size: 16px; line-height: 1; }
@@ -349,6 +363,16 @@ h2 { font-size: 20px; }
 }
 .day-cell--sel .day-cell__dow { color: var(--primary); font-weight: 600; }
 .day-cell--off { opacity: 0.3; cursor: default; pointer-events: none; }
+/* Пустой день (в диапазоне, без пар) — приглушаем, но кликается */
+.day-cell--empty { opacity: 0.4; }
+/* Сегодня — акцентный жёлтый (приоритет над выбранным) */
+.day-cell--today { opacity: 1; }
+.day-cell--today .day-cell__num {
+  background: var(--amber);
+  color: #1A1530;
+  font-weight: 700;
+}
+.day-cell--today .day-cell__dow { color: var(--amber); font-weight: 600; }
 
 /* Навигация дня */
 .day-nav {
@@ -518,8 +542,16 @@ h2 { font-size: 20px; }
 }
 .detail__row:last-child { border-bottom: none; }
 .detail__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+.detail__dot--amber { background: var(--amber); }
 .detail__k { font-size: 11px; color: var(--text-dim); }
 .detail__v { font-size: 14px; font-weight: 500; margin-top: 2px; }
+.detail__section { margin-top: var(--sp-4); }
+.detail__section-title {
+  font-size: 10px; font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: 1px; text-transform: uppercase;
+  margin-bottom: var(--sp-1);
+}
 
 /* Настройки */
 .settings__label {

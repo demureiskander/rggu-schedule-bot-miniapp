@@ -1,12 +1,12 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=2';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=2';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=2';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=2';
-import { applyTheme } from './theme.js?v=2';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=2';
-import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=2';
+import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=3';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=3';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=3';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=3';
+import { applyTheme } from './theme.js?v=3';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=3';
+import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=3';
 
 const LAYOUT_LABELS = { block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный' };
 
@@ -438,26 +438,49 @@ export function renderSchedule(mount, params, router) {
     draw();
   }
 
+  // Прыжок на сегодняшний день (в пределах загруженного диапазона).
+  function goToday() {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const { min, max } = rangeBounds();
+    if (today.getTime() < min || today.getTime() > max) return;
+    haptic('light');
+    selected = today;
+    draw();
+  }
+
   function draw() {
     screen.innerHTML = '';
 
-    // Шапка: погода (если включена) + шестерёнка.
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const isToday = selected.toDateString() === today.toDateString();
+    const { min, max } = rangeBounds();
+    const todayInRange = today.getTime() >= min && today.getTime() <= max;
+
+    // Шапка: погода (если включена) слева; справа — «Сегодня» (если не на сегодня) + шестерёнка.
     const top = h('<div class="sched-top"></div>');
     const wEl = get.weatherEnabled() ? weatherBadge(get.weather()) : null;
     top.appendChild(wEl || h('<span></span>'));
+    const right = h('<div class="sched-top__right"></div>');
+    if (!isToday && todayInRange) {
+      const todayBtn = h('<button class="today-btn">Сегодня</button>');
+      todayBtn.addEventListener('click', goToday);
+      right.appendChild(todayBtn);
+    }
     const gear = h('<button class="icon-btn" aria-label="Настройки">⚙</button>');
     gear.addEventListener('click', () => openSettings());
-    top.appendChild(gear);
+    right.appendChild(gear);
+    top.appendChild(right);
     screen.appendChild(top);
 
-    // Полоска недели + навигация дня + счётчик. Дни вне диапазона — погашены.
-    const { min, max } = rangeBounds();
+    // Полоска недели (7 дней) + навигация дня + счётчик.
+    // Вне диапазона — погашены; пустые дни (если включено) — приглушены; сегодня — жёлтый.
     const inRange = (d) => d.getTime() >= min && d.getTime() <= max;
-    screen.appendChild(weekStrip(selected, selectDate, inRange));
+    const hasLessons = (d) => (schedule.byDate[tsToDateKey(d)] || []).length > 0;
+    screen.appendChild(weekStrip(selected, selectDate, {
+      isEnabled: inRange, hasLessons, dimEmpty: get.highlightEmptyDays(),
+    }));
     screen.appendChild(dayNav(selected, () => changeDay(-1), () => changeDay(1)));
 
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const isToday = selected.toDateString() === today.toDateString();
     const lessons = schedule.byDate[tsToDateKey(selected)] || [];
 
     const counter = h(`<div class="counter">${esc(counterText(lessons, isToday))}</div>`);
@@ -516,10 +539,47 @@ export function renderSchedule(mount, params, router) {
     if (w) { setWeather(w); if (schedule) draw(); }
   }
 
+  // Сводка по предмету до конца семестра (из загруженного расписания = весь семестр).
+  // remaining/breakdown — от сегодняшней даты; next — ближайшая будущая пара;
+  // exam — занятие с lessontype 'экзамен' (если есть).
+  function subjectStats(subject) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const atDateTime = (dateKey, start) => {
+      const ts = dateKeyToTs(dateKey);
+      const [hh, mm] = (start || '00:00').split(':').map(Number);
+      return ts + (hh * 60 + mm) * 60000;
+    };
+    let remaining = 0, lectures = 0, seminars = 0, other = 0;
+    let next = null, exam = null;
+    for (const dateKey of schedule.dates) {
+      const ts = dateKeyToTs(dateKey);
+      for (const l of schedule.byDate[dateKey]) {
+        if (l.subject !== subject) continue;
+        const type = (l.lessontype || '').toLowerCase();
+        // Экзамен — отдельной строкой, в «осталось пар» и «следующую» не считаем.
+        if (type === 'экзамен') {
+          if (!exam) exam = { dateKey, start: l.start };
+          continue;
+        }
+        if (ts >= today.getTime()) {
+          remaining++;
+          if (type === 'лек') lectures++;
+          else if (type === 'сем') seminars++;
+          else other++;
+          if (!next && atDateTime(dateKey, l.start) > now.getTime()) {
+            next = { dateKey, start: l.start };
+          }
+        }
+      }
+    }
+    return { remaining, lectures, seminars, other, next, exam };
+  }
+
   // --- Sheet: детали пары (6.7) ---
   function openDetail(lesson) {
     haptic('light');
-    openSheet(lessonDetail(lesson), router);
+    openSheet(lessonDetail(lesson, subjectStats(lesson.subject)), router);
   }
 
   // --- Sheet: настройки (6.6) ---
@@ -562,6 +622,12 @@ export function renderSchedule(mount, params, router) {
     content.appendChild(toggleRow('Погода', get.weatherEnabled(), async (on) => {
       await set('weatherEnabled', on);
       if (on) await ensureWeather();
+      draw();
+    }));
+
+    // Подсветка дней без пар.
+    content.appendChild(toggleRow('Подсвечивать дни без пар', get.highlightEmptyDays(), async (on) => {
+      await set('highlightEmptyDays', on);
       draw();
     }));
 

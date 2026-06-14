@@ -2,12 +2,12 @@
 // Persistence: Telegram CloudStorage (синхронизируется между устройствами) с
 // fallback на localStorage. В памяти держим текущее состояние и кэш расписания.
 
-import { cloudGet, cloudSet, hasCloudStorage } from './telegram.js?v=2';
+import { cloudGet, cloudSet, hasCloudStorage } from './telegram.js?v=3';
 
 const LS_PREFIX = 'rsuhspace:';
 
 // Ключи, которые персистим.
-const PERSIST_KEYS = ['group', 'layout', 'theme', 'weatherEnabled'];
+const PERSIST_KEYS = ['group', 'layout', 'theme', 'weatherEnabled', 'highlightEmptyDays'];
 
 // Ключи, реально найденные в хранилище при loadState (для «первого запуска»).
 const persistedKeys = new Set();
@@ -18,6 +18,7 @@ const state = {
   layout: 'block',        // 'block' | 'compact' | 'ribbon'
   theme: 'dark',          // 'dark' | 'light'
   weatherEnabled: false,  // boolean
+  highlightEmptyDays: true, // boolean — серое выделение дней без пар
 
   // Сессионное (не персистим):
   schedule: null,         // { byDate: { 'ДД.ММ.ГГГГ': [lesson...] }, dates: [...], fetchedAt }
@@ -66,7 +67,7 @@ function deserialize(key, raw) {
   if (key === 'group') {
     try { return JSON.parse(raw); } catch (_) { return undefined; }
   }
-  if (key === 'weatherEnabled') return raw === 'true';
+  if (key === 'weatherEnabled' || key === 'highlightEmptyDays') return raw === 'true';
   return raw;
 }
 
@@ -101,6 +102,7 @@ export const get = {
   layout: () => state.layout,
   theme: () => state.theme,
   weatherEnabled: () => state.weatherEnabled,
+  highlightEmptyDays: () => state.highlightEmptyDays,
   schedule: () => state.schedule,
   weather: () => state.weather,
 };

@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=2';
+} from './constants.js?v=3';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -55,7 +55,7 @@ function renderBlock(lesson) {
   const { label, kind } = lessonTypeInfo(lesson.lessontype);
   const card = h(`
     <button class="lesson lesson--block kind-${kind}">
-      <div class="lesson__time">${esc(lesson.start)} — ${esc(lesson.end)}</div>
+      <div class="lesson__time">${lesson.pair ? `${lesson.pair}-я пара · ` : ''}${esc(lesson.start)} — ${esc(lesson.end)}</div>
       <div class="lesson__title">${esc(lesson.subject)}</div>
       <div class="lesson__badge-row"><span class="badge badge--${kind}">${esc(label)}</span></div>
       ${metaLine(lesson) ? `<div class="lesson__meta">${esc(metaLine(lesson))}</div>` : ''}
@@ -101,23 +101,37 @@ function renderRibbon(lesson) {
 // Шапка: полоска недели, навигация по дню, счётчик, погода
 // =========================================================
 
-// Полоска 6 дней (Пн–Сб) недели выбранного дня. onSelect(Date).
-// isEnabled(Date) -> bool: дни вне загруженного диапазона гасятся и не кликаются
-// (честнее клампа: пустой день = «каникулы», а недоступный — явно неактивен).
-export function weekStrip(selectedDate, onSelect, isEnabled = () => true) {
-  // Понедельник недели выбранного дня.
+// Полоска всех 7 дней (Пн–Вс) недели выбранного дня. onSelect(Date).
+// opts: { isEnabled(d), hasLessons(d), dimEmpty }
+//  - !isEnabled → вне загруженного диапазона: гасим, без тапа;
+//  - сегодня → акцентный жёлтый;
+//  - выбранный → фиолетовый кружок;
+//  - пустой день (в диапазоне, без пар) + dimEmpty → приглушаем.
+export function weekStrip(selectedDate, onSelect, opts = {}) {
+  const { isEnabled = () => true, hasLessons = () => true, dimEmpty = true } = opts;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
   const monday = new Date(selectedDate);
   const dow = (monday.getDay() + 6) % 7; // 0 = Пн
   monday.setDate(monday.getDate() - dow);
 
   const strip = h('<div class="week-strip"></div>');
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     const isSel = d.toDateString() === selectedDate.toDateString();
+    const isToday = d.toDateString() === today.toDateString();
     const off = !isEnabled(d);
+    const empty = !off && dimEmpty && !hasLessons(d);
+    const cls = [
+      'day-cell',
+      isToday ? 'day-cell--today' : '',
+      isSel ? 'day-cell--sel' : '',
+      off ? 'day-cell--off' : '',
+      empty ? 'day-cell--empty' : '',
+    ].filter(Boolean).join(' ');
     const cell = h(`
-      <button class="day-cell${isSel ? ' day-cell--sel' : ''}${off ? ' day-cell--off' : ''}"${off ? ' disabled' : ''}>
+      <button class="${cls}"${off ? ' disabled' : ''}>
         <span class="day-cell__num">${d.getDate()}</span>
         <span class="day-cell__dow">${WEEKDAYS_SHORT[d.getDay()]}</span>
       </button>
@@ -182,8 +196,15 @@ export function weatherBadge(weather) {
   return h(`<div class="weather"><span class="weather__icon">${icon}</span><span class="weather__temp">${esc(temp)}</span></div>`);
 }
 
+// «ДД.ММ.ГГГГ» + слот → человекочитаемая дата «16 июня, 09:00».
+function humanDate(dateKey, start) {
+  const [d, m] = dateKey.split('.').map(Number);
+  return `${d} ${MONTHS_GENITIVE[m - 1]}${start ? `, ${start}` : ''}`;
+}
+
 // Контент bottom sheet'а деталей пары (без обёртки sheet).
-export function lessonDetail(lesson) {
+// stats (опц.) — сводка «по предмету», см. screens.subjectStats().
+export function lessonDetail(lesson, stats) {
   const { label, kind } = lessonTypeInfo(lesson.lessontype);
   const rows = [];
   const dur = '90 мин';
@@ -213,5 +234,40 @@ export function lessonDetail(lesson) {
       </div>
     `));
   }
+
+  // Блок «по этому предмету» (до конца семестра, из загруженного расписания).
+  if (stats) {
+    const lines = [];
+    if (stats.next) lines.push(['Следующая пара', humanDate(stats.next.dateKey, stats.next.start)]);
+    if (stats.remaining > 0) {
+      const parts = [];
+      if (stats.lectures) parts.push(`${stats.lectures} лек.`);
+      if (stats.seminars) parts.push(`${stats.seminars} сем.`);
+      if (stats.other) parts.push(`${stats.other} др.`);
+      const breakdown = parts.length ? ` (${parts.join(' · ')})` : '';
+      lines.push(['Осталось до конца семестра', `${stats.remaining} пар${breakdown}`]);
+    }
+    if (stats.exam) lines.push(['Экзамен', humanDate(stats.exam.dateKey, stats.exam.start)]);
+
+    if (lines.length) {
+      const sec = h(`
+        <div class="detail__section">
+          <div class="detail__section-title">По этому предмету</div>
+          <div class="detail__rows"></div>
+        </div>
+      `);
+      const secRows = sec.querySelector('.detail__rows');
+      for (const [k, v] of lines) {
+        secRows.appendChild(h(`
+          <div class="detail__row">
+            <span class="detail__dot detail__dot--amber"></span>
+            <div><div class="detail__k">${esc(k)}</div><div class="detail__v">${esc(v)}</div></div>
+          </div>
+        `));
+      }
+      wrap.appendChild(sec);
+    }
+  }
+
   return wrap;
 }
