@@ -140,7 +140,6 @@ function renderPickerForm(mount, params, router) {
     const item = h(`
       <button class="option-row">
         <span class="option-row__label">${esc(f.label)}</span>
-        <span class="option-row__sub">${esc(f.code)}</span>
       </button>
     `);
     item.addEventListener('click', () => {
