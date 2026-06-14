@@ -90,8 +90,8 @@ export const WEATHER_ICONS = {
 
 // Маскот: состояние -> файл спрайта.
 export const MASCOT = {
-  wave: 'public/mascot/wave.svg',
-  sleep: 'public/mascot/sleep.svg',
-  sad: 'public/mascot/sad.svg',
-  think: 'public/mascot/think.svg',
+  wave: 'public/mascot/wave.webp',
+  sleep: 'public/mascot/sleep.webp',
+  sad: 'public/mascot/sad.webp',
+  think: 'public/mascot/think.webp',
 };

@@ -1,10 +1,7 @@
 // Точка входа: инициализация SDK/темы/persistence + стек-роутер экранов.
 
-import {
-  initWebApp, colorScheme, onThemeChanged,
-  onBackButton, setBackVisible,
-} from './telegram.js';
-import { loadState, isPersisted, get } from './store.js';
+import { initWebApp, onBackButton, setBackVisible } from './telegram.js';
+import { loadState, get } from './store.js';
 import { applyTheme, resolveInitialTheme } from './theme.js';
 import * as screens from './screens.js';
 
@@ -70,11 +67,8 @@ async function start() {
 
   await loadState();
 
+  // Тема из единого источника (store) до первого рендера контента.
   applyTheme(resolveInitialTheme());
-  // Реакция на смену темы самого Telegram — только если пользователь не зафиксировал свою.
-  onThemeChanged(() => {
-    if (!isPersisted('theme')) applyTheme(colorScheme() || 'dark');
-  });
 
   // Системный BackButton: сперва закрыть открытый sheet, иначе навигация назад.
   onBackButton(() => { if (!screens.handleBack()) router.back(); });

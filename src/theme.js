@@ -1,16 +1,16 @@
-// Управление темой. Вынесено из main.js, чтобы настройки переключали тему
-// без глобалов (window.*). Источник правды по выбранной теме — store.
+// Управление темой. Единственный источник истины — store.theme
+// (дефолт 'dark', либо сохранённое пользователем). И стартовая инициализация,
+// и тумблер в настройках читают/пишут одно и то же значение — без расхождения
+// CSS и состояния.
 
-import { colorScheme } from './telegram.js';
-import { isPersisted, get } from './store.js';
+import { get } from './store.js';
 
 // Применяет тему к документу (CSS-токены висят на [data-theme]).
 export function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
 }
 
-// Стартовая тема: сохранённая пользователем > тема Telegram > 'dark'.
+// Стартовая тема = текущее значение store (дефолт 'dark' или сохранённое).
 export function resolveInitialTheme() {
-  if (isPersisted('theme')) return get.theme();
-  return colorScheme() || 'dark';
+  return get.theme();
 }
