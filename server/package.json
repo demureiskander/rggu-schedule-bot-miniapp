@@ -1,0 +1,13 @@
+{
+  "name": "rsuhspace-proxy",
+  "version": "1.0.0",
+  "description": "Standalone прокси для Mini App «РсухСпейс»: API РГГУ (CORS) + погода open-meteo.",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

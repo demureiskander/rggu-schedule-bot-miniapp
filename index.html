@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>РсухСпейс — расписание РГГУ</title>
+
+  <link rel="icon" href="public/favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="public/manifest.webmanifest" />
+
+  <!-- Onest (Google Fonts) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
+
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Корень приложения: экраны рендерятся сюда (screens.js) -->
+  <div id="app" class="app"></div>
+
+  <!-- Слой bottom sheet'ов (детали пары / настройки) -->
+  <div id="sheet-root"></div>
+
+  <!-- Точка входа (добавляется в части 2/3) -->
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

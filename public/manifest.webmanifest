@@ -1,0 +1,13 @@
+{
+  "name": "РсухСпейс — расписание РГГУ",
+  "short_name": "РсухСпейс",
+  "description": "Расписание студентов РГГУ. Mini App бота @RsuhSpaceBot.",
+  "lang": "ru",
+  "start_url": "../index.html",
+  "display": "standalone",
+  "background_color": "#1D105E",
+  "theme_color": "#1D105E",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
