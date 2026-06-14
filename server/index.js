@@ -38,14 +38,18 @@ function sendJSON(res, status, payload) {
 }
 
 // --- Upstream-вызовы API РГГУ ---
-// Поля multipart взяты из рабочего контракта (референс rsuhspace/rsuh.space):
+// Upstream — Yandex Cloud Function. Метод передаётся НЕ как path-сегмент, а как
+// query-параметр ?method=/<Метод> (значение начинается со слэша — так шлёт бот).
+// Тело — FormData (multipart). Поля:
 //   Get_Flows_List:     поле '0' = JSON { eduform, course }
 //   Get_Schedule_Table: eduform, course, flow, intervalMode=4, menuMode=flow
 // ВНИМАНИЕ: eduform — числовой id формы ('1'..'12'), НЕ код '1-Б-О'.
 
 async function callUpstream(method, formData) {
   if (!API_URL) throw new Error('API_URL not configured');
-  const res = await fetch(`${API_URL}/${method}`, {
+  // Литеральный слэш в значении (method=/Get_Flows_List) — как шлёт бот.
+  const url = `${API_URL}?method=/${method}`;
+  const res = await fetch(url, {
     method: 'POST',
     body: formData,
   });
