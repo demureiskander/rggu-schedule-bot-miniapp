@@ -64,6 +64,24 @@ export function formOptions() {
   }));
 }
 
+// Формы, сгруппированные по уровню: Бакалавриат / Магистратура / Второе высшее.
+// В каждой группе элемент = { id, label } с подписью по форме посещения (без
+// дублирования уровня — уровень в заголовке группы).
+export function formGroups() {
+  const order = ['bak', 'mag', 'second'];
+  const titles = { bak: 'Бакалавриат', mag: 'Магистратура', second: 'Второе высшее' };
+  const groups = { bak: [], mag: [], second: [] };
+  for (const [id, code] of Object.entries(GROUP_FORMS)) {
+    const [level, degree, mode] = code.split('-');
+    const key = level === '2' ? 'second' : (degree === 'М' ? 'mag' : 'bak');
+    const m = FORM_MODE[mode] || mode;
+    groups[key].push({ id, label: m.charAt(0).toUpperCase() + m.slice(1) });
+  }
+  return order
+    .filter((k) => groups[k].length)
+    .map((k) => ({ title: titles[k], items: groups[k] }));
+}
+
 // Курсы для выбора.
 export const COURSES = [1, 2, 3, 4, 5, 6];
 
@@ -88,6 +106,8 @@ export const INSTITUTES = {
   ИМОиПН: 'Институт международных отношений и политических наук',
   ИИРиДК: 'Институт истории религий и духовной культуры',
   ОИСвГС: 'Отделение интеллектуальных систем в гуманитарной сфере',
+  ИЖиМ:   'Институт журналистики и медиаиндустрий',
+  ИЕиВИ:  'Институт евразийских и восточных исследований',
 };
 
 // Аббревиатура института из кода группы (name = "ИАИ-ФАД-ДА-... (Группа: 1)").
@@ -111,11 +131,13 @@ export function splitDetails(details) {
 // Институты слиты по полному названию (ФРиСО/ФРИСО → одна ветка), отсортированы
 // по алфавиту названия; нерасшифрованные (фолбэк) — в конце.
 export function buildTree(flows) {
-  const byInst = new Map(); // displayName -> { name, resolved, dirs: Map(dir -> flows[]) }
+  const byInst = new Map(); // displayName -> { name, resolved, abbrs:Set, dirs: Map(dir -> flows[]) }
   for (const f of flows) {
-    const { name, resolved } = instituteName(instituteAbbr(f.name));
-    if (!byInst.has(name)) byInst.set(name, { name, resolved, dirs: new Map() });
+    const abbr = instituteAbbr(f.name);
+    const { name, resolved } = instituteName(abbr);
+    if (!byInst.has(name)) byInst.set(name, { name, resolved, abbrs: new Set(), dirs: new Map() });
     const inst = byInst.get(name);
+    inst.abbrs.add(abbr);
     const { direction } = splitDetails(f.details);
     const dir = direction || 'Без направления';
     if (!inst.dirs.has(dir)) inst.dirs.set(dir, []);

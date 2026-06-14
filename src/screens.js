@@ -1,12 +1,12 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js';
-import { formOptions, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js';
-import { APP_VERSION, BOT_USERNAME } from '../config.js';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js';
-import { applyTheme } from './theme.js';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js';
-import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js';
+import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=2';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=2';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=2';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=2';
+import { applyTheme } from './theme.js?v=2';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=2';
+import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=2';
 
 const LAYOUT_LABELS = { block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный' };
 
@@ -129,39 +129,52 @@ export function renderPicker(mount, params, router) {
   return renderPickerGroup(mount, params, router);
 }
 
-function pickerHeader(title, subtitle) {
-  return h(`
+// Шапка шага с видимой кнопкой «назад» (← в интерфейсе, помимо системного
+// BackButton). Стрелку показываем, только если есть куда возвращаться.
+function pickerHeader(title, subtitle, router) {
+  const canBack = router && !router.isRoot();
+  const head = h(`
     <header class="picker-head">
-      <h2>${esc(title)}</h2>
+      <div class="picker-head__top">
+        ${canBack ? '<button class="picker-back" aria-label="Назад">←</button>' : ''}
+        <h2>${esc(title)}</h2>
+      </div>
       ${subtitle ? `<p class="caption">${esc(subtitle)}</p>` : ''}
     </header>
   `);
+  const back = head.querySelector('.picker-back');
+  if (back) back.addEventListener('click', () => { haptic('light'); router.back(); });
+  return head;
 }
 
 function renderPickerForm(mount, params, router) {
   const screen = h('<section class="picker stack"></section>');
-  screen.appendChild(pickerHeader('Форма обучения'));
-  const list = h('<div class="option-list"></div>');
-  for (const f of formOptions()) {
-    const item = h(`
-      <button class="option-row">
-        <span class="option-row__label">${esc(f.label)}</span>
-      </button>
-    `);
-    item.addEventListener('click', () => {
-      hapticSelection();
-      router.navigate('picker', { step: 'course', form: f.id });
-    });
-    list.appendChild(item);
+  screen.appendChild(pickerHeader('Форма обучения', '', router));
+  // Сгруппировано по уровню: Бакалавриат / Магистратура / Второе высшее.
+  for (const group of formGroups()) {
+    screen.appendChild(h(`<div class="picker-group-title">${esc(group.title)}</div>`));
+    const list = h('<div class="option-list"></div>');
+    for (const f of group.items) {
+      const item = h(`
+        <button class="option-row">
+          <span class="option-row__label">${esc(f.label)}</span>
+        </button>
+      `);
+      item.addEventListener('click', () => {
+        hapticSelection();
+        router.navigate('picker', { step: 'course', form: f.id });
+      });
+      list.appendChild(item);
+    }
+    screen.appendChild(list);
   }
-  screen.appendChild(list);
   mount.appendChild(screen);
 }
 
 function renderPickerCourse(mount, params, router) {
   const screen = h('<section class="picker stack"></section>');
   const formLabel = formatFormCode(GROUP_FORMS[params.form] || '');
-  screen.appendChild(pickerHeader('Курс', formLabel));
+  screen.appendChild(pickerHeader('Курс', formLabel, router));
   const grid = h('<div class="course-grid"></div>');
   for (const c of COURSES) {
     const item = h(`<button class="course-chip">${c} курс</button>`);
@@ -227,7 +240,7 @@ function withFlows(body, params, router, onReady) {
 function renderPickerInstitute(mount, params, router) {
   const screen = h('<section class="picker stack"></section>');
   const formLabel = formatFormCode(GROUP_FORMS[params.form] || '');
-  screen.appendChild(pickerHeader('Институт', `${formLabel} · ${params.course} курс`));
+  screen.appendChild(pickerHeader('Институт', `${formLabel} · ${params.course} курс`, router));
   const body = h('<div class="picker-body"></div>');
   screen.appendChild(body);
   mount.appendChild(screen);
@@ -244,9 +257,11 @@ function renderPickerInstitute(mount, params, router) {
       list.innerHTML = '';
       for (const inst of buildTree(flows)) {
         const count = [...inst.dirs.values()].reduce((s, a) => s + a.length, 0);
+        // Расшифрованным дописываем аббревиатуру в скобках; фолбэк — без дубля.
+        const title = inst.resolved ? `${inst.name} (${[...inst.abbrs].join('/')})` : inst.name;
         const item = h(`
           <button class="option-row">
-            <span class="option-row__label">${esc(inst.name)}</span>
+            <span class="option-row__label">${esc(title)}</span>
             <span class="option-row__sub">${inst.dirs.size} напр. · ${count} групп</span>
           </button>
         `);
@@ -290,7 +305,7 @@ function renderPickerInstitute(mount, params, router) {
 // Шаг 4 — направление.
 function renderPickerDirection(mount, params, router) {
   const screen = h('<section class="picker stack"></section>');
-  screen.appendChild(pickerHeader('Направление', params.inst));
+  screen.appendChild(pickerHeader('Направление', params.inst, router));
   const body = h('<div class="picker-body"></div>');
   screen.appendChild(body);
   mount.appendChild(screen);
@@ -320,7 +335,7 @@ function renderPickerDirection(mount, params, router) {
 // Шаг 5 — группа (профиль показываем подписью).
 function renderPickerGroup(mount, params, router) {
   const screen = h('<section class="picker stack"></section>');
-  screen.appendChild(pickerHeader('Группа', params.dir));
+  screen.appendChild(pickerHeader('Группа', params.dir, router));
   const body = h('<div class="picker-body"></div>');
   screen.appendChild(body);
   mount.appendChild(screen);
