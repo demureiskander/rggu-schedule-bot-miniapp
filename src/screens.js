@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=28';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=28';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=28';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=28';
-import { applyTheme } from './theme.js?v=28';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=28';
+} from './api.js?v=29';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=29';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=29';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=29';
+import { applyTheme } from './theme.js?v=29';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=29';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=28';
+} from './render.js?v=29';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
