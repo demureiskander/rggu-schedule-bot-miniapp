@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=24';
+} from './constants.js?v=25';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -133,11 +133,14 @@ function renderRibbon(lesson, viewMode) {
 //    «от scrollLeft=0 до выбранного» выглядит как длинный скролл от начала);
 //  - пустой день (без пар) + dimEmpty → приглушаем.
 export function weekStrip(days, selectedDate, onSelect, opts = {}) {
-  const { hasLessons = () => true, dimEmpty = true, inRange = null } = opts;
+  const { hasLessons = () => true, dimEmpty = true, inRange = null, weekly = false } = opts;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
-  const strip = h('<div class="week-strip"></div>');
+  const strip = h(`<div class="week-strip${weekly ? ' week-strip--weekly' : ''}"></div>`);
   let selectedCell = null;
+  // В недельном виде 7 дней текущей недели оборачиваем в один контейнер-pill —
+  // получается общая скруглённая плашка за всеми днями (вместо отдельных кружков).
+  let pill = null;
   for (const d of days) {
     const isSel = d.toDateString() === selectedDate.toDateString();
     const isToday = d.toDateString() === today.toDateString();
@@ -158,14 +161,21 @@ export function weekStrip(days, selectedDate, onSelect, opts = {}) {
     `);
     cell.addEventListener('click', () => onSelect(new Date(d)));
     if (isSel) selectedCell = cell;
-    strip.appendChild(cell);
+    if (weekly && inWeek) {
+      if (!pill) { pill = h('<div class="week-strip__pill"></div>'); strip.appendChild(pill); }
+      pill.appendChild(cell);
+    } else {
+      strip.appendChild(cell);
+    }
   }
 
-  // Центрируем мгновенно через scrollLeft (а не scrollIntoView — он может
-  // запускать smooth-анимацию, и пользователь видит «прокрутку от начала»).
+  // Центрируем мгновенно: используем bounding-rect (offsetLeft был бы относителен
+  // ближайшему offsetParent — а с pill-обёрткой это уже не сам strip).
   if (selectedCell) {
     requestAnimationFrame(() => {
-      const target = selectedCell.offsetLeft - (strip.clientWidth - selectedCell.offsetWidth) / 2;
+      const cr = selectedCell.getBoundingClientRect();
+      const sr = strip.getBoundingClientRect();
+      const target = strip.scrollLeft + (cr.left - sr.left) - (strip.clientWidth - cr.width) / 2;
       strip.scrollLeft = Math.max(0, target);
     });
   }

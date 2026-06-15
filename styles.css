@@ -388,6 +388,19 @@ h2 { font-size: 20px; }
   background: var(--selected);
   color: var(--selected-text);
 }
+/* Недельный режим: одна общая pill-плашка за всеми 7 днями недели вместо
+   отдельных подсвеченных кружков. Сегодняшний/выбранный кружки остаются
+   поверх плашки (их собственные стили __num выигрывают по специфичности). */
+.week-strip__pill {
+  display: flex;
+  gap: 4px;
+  background: var(--surface-2);
+  border-radius: 999px;
+}
+.week-strip--weekly .day-cell--in-range:not(.day-cell--today):not(.day-cell--sel) .day-cell__num {
+  background: transparent;
+  color: var(--text);
+}
 
 /* Навигация дня */
 .day-nav {

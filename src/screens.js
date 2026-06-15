@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=24';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=24';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=24';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=24';
-import { applyTheme } from './theme.js?v=24';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=24';
+} from './api.js?v=25';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=25';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=25';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=25';
+import { applyTheme } from './theme.js?v=25';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=25';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=24';
+} from './render.js?v=25';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -584,6 +584,7 @@ export function renderSchedule(mount, params, router) {
     screen.appendChild(weekStrip(days, selected, selectDate, {
       hasLessons, dimEmpty: get.highlightEmptyDays(),
       inRange: isWeek ? inCurrentWeek : null,
+      weekly: isWeek,
     }));
 
     if (isWeek) {
