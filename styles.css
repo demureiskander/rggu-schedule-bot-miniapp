@@ -414,6 +414,28 @@ h2 { font-size: 20px; }
 }
 
 .sched-body { min-height: 300px; }
+/* Мягкая анимация смены дня/недели — только тело, без шапки и полоски дней.
+   forward → приехать справа; backward → слева; fade → быстрое появление. */
+.sched-body--in-forward  { animation: sched-slide-in-right 220ms ease-out both; }
+.sched-body--in-backward { animation: sched-slide-in-left 220ms ease-out both; }
+.sched-body--in-fade     { animation: sched-fade-in 180ms ease-out both; }
+@keyframes sched-slide-in-right {
+  from { transform: translateX(28px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes sched-slide-in-left {
+  from { transform: translateX(-28px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes sched-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sched-body--in-forward,
+  .sched-body--in-backward,
+  .sched-body--in-fade { animation: none; }
+}
 .mascot-block {
   display: flex;
   flex-direction: column;

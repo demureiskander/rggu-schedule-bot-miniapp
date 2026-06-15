@@ -1,15 +1,15 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=13';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=13';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=13';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=13';
-import { applyTheme } from './theme.js?v=13';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=13';
+import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=14';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=14';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=14';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=14';
+import { applyTheme } from './theme.js?v=14';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=14';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, lessonDetail,
-} from './render.js?v=13';
+} from './render.js?v=14';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -428,12 +428,20 @@ export function renderSchedule(mount, params, router) {
     };
   }
 
+  // Направление мягкой анимации тела при следующем draw():
+  //   'forward'  — приехать справа (день/неделя вперёд)
+  //   'backward' — приехать слева (день/неделя назад)
+  //   'fade'     — плавное появление без направления (для «Сегодня»)
+  //   null       — без анимации (первая отрисовка, обновление по weather и т.п.)
+  let nextDirection = null;
+
   function changeDay(delta) {
     const next = new Date(selected);
     next.setDate(next.getDate() + delta);
     const { min, max } = rangeBounds();
     if (next.getTime() < min || next.getTime() > max) return;
     haptic('light');
+    nextDirection = delta > 0 ? 'forward' : 'backward';
     selected = next;
     draw();
   }
@@ -447,12 +455,15 @@ export function renderSchedule(mount, params, router) {
     if (next.getTime() > max) next.setTime(max);
     if (next.toDateString() === selected.toDateString()) return;
     haptic('light');
+    nextDirection = delta > 0 ? 'forward' : 'backward';
     selected = next;
     draw();
   }
 
   function selectDate(date) {
     hapticSelection();
+    const cmp = date.getTime() - selected.getTime();
+    nextDirection = cmp > 0 ? 'forward' : cmp < 0 ? 'backward' : null;
     selected = date;
     draw();
   }
@@ -463,8 +474,17 @@ export function renderSchedule(mount, params, router) {
     const { min, max } = rangeBounds();
     if (today.getTime() < min || today.getTime() > max) return;
     haptic('light');
+    nextDirection = 'fade';
     selected = today;
     draw();
+  }
+
+  // Помечает sched-body классом анимации входа (или ничего, если nextDirection
+  // не выставлен — например, первая отрисовка или обновление по погоде).
+  function applyEnterAnimation(bodyEl) {
+    if (!nextDirection) return;
+    bodyEl.classList.add(`sched-body--in-${nextDirection}`);
+    nextDirection = null;
   }
 
   function draw() {
@@ -536,6 +556,7 @@ export function renderSchedule(mount, params, router) {
 
     // Тело: список пар или пустой день.
     const body = h('<div class="sched-body"></div>');
+    applyEnterAnimation(body);
     screen.appendChild(body);
     attachSwipe(body);
 
@@ -570,6 +591,7 @@ export function renderSchedule(mount, params, router) {
     screen.appendChild(h(`<div class="counter">${weekTotal ? `${weekTotal} ${pairWord(weekTotal)} на неделе` : 'на неделе пар нет'}</div>`));
 
     const body = h('<div class="sched-body"></div>');
+    applyEnterAnimation(body);
     screen.appendChild(body);
     attachWeekSwipe(body);
 
