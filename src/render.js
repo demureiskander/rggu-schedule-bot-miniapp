@@ -29,9 +29,12 @@ function plural(n, forms) {
 // Тип пары: лекция / семинар / прочее (для цвета бейджа и точки).
 export function lessonTypeInfo(type) {
   const t = (type || '').toLowerCase();
+  const isLec = t.includes('лек');
+  const isSem = t.includes('сем');
   const label = LECTURE_TYPES[t] || (type ? type[0].toUpperCase() + type.slice(1) : 'Занятие');
-  if (t === 'лек') return { label, kind: 'lecture' };
-  if (t === 'сем') return { label, kind: 'seminar' };
+  if (isLec && isSem) return { label: 'Лекция-семинар', kind: 'lecture-seminar' };
+  if (isLec) return { label, kind: 'lecture' };
+  if (isSem) return { label, kind: 'seminar' };
   return { label, kind: 'other' };
 }
 
