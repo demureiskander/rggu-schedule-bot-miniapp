@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=22';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=22';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=22';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=22';
-import { applyTheme } from './theme.js?v=22';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=22';
+} from './api.js?v=23';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=23';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=23';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=23';
+import { applyTheme } from './theme.js?v=23';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=23';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=22';
+} from './render.js?v=23';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -870,7 +870,7 @@ export function renderSchedule(mount, params, router) {
     content.appendChild(h('<div class="settings__hint">Если приложение полезно — буду рад поддержке</div>'));
     const support = h('<div class="settings__list"></div>');
     support.appendChild(linkRow('⭐', 'Telegram Stars', '', () => openTelegramLink('https://t.me/RsuhSpaceBot')));
-    support.appendChild(linkRow('💳', 'Cloudtips', '', () => openLink('https://pay.cloudtips.ru/p/b5c9b884')));
+    support.appendChild(linkRow('💳', 'Cloudtips', 'рублями по СБП', () => openLink('https://pay.cloudtips.ru/p/b5c9b884')));
     content.appendChild(support);
 
     content.appendChild(h('<div class="settings__divider"></div>'));
@@ -879,8 +879,7 @@ export function renderSchedule(mount, params, router) {
     content.appendChild(h('<div class="settings__label">О приложении</div>'));
     const about = h('<div class="settings__list"></div>');
     about.appendChild(linkRow('📱', '@RsuhSpaceBot', 'наш бот', () => openTelegramLink('https://t.me/RsuhSpaceBot')));
-    about.appendChild(linkRow('✉️', '@textquestion', 'связаться', () => openTelegramLink('https://t.me/textquestion')));
-    about.appendChild(linkRow('📄', 'Соглашение · Конфиденциальность', '', () => openLink('#')));
+    about.appendChild(linkRow('✉️', '@textquestion', 'связаться в Telegram', () => openTelegramLink('https://t.me/textquestion')));
     content.appendChild(about);
 
     content.appendChild(h(`<div class="settings__version">Версия ${esc(APP_VERSION)} · ${esc(BOT_USERNAME)}</div>`));
