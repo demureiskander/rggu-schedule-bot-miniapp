@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=23';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=23';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=23';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=23';
-import { applyTheme } from './theme.js?v=23';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=23';
+} from './api.js?v=24';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=24';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=24';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=24';
+import { applyTheme } from './theme.js?v=24';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=24';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=23';
+} from './render.js?v=24';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -893,7 +893,7 @@ export function renderSchedule(mount, params, router) {
   function createFab() {
     const icon = isTeacher
       ? '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
-      : '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+      : '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c0-4 11-4 11 0"/><circle cx="17" cy="17" r="3"/><path d="M19.3 19.3l2.4 2.4"/></svg>';
     const el = h(`<button class="fab" aria-label="${isTeacher ? 'Закрыть' : 'Поиск преподавателя'}">${icon}</button>`);
     el.addEventListener('click', () => {
       haptic('light');
