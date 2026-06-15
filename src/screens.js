@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=21';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=21';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=21';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=21';
-import { applyTheme } from './theme.js?v=21';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=21';
+} from './api.js?v=22';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=22';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=22';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=22';
+import { applyTheme } from './theme.js?v=22';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=22';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=21';
+} from './render.js?v=22';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -93,9 +93,12 @@ function openSheet(content, router) {
 
   overlay.addEventListener('click', (e) => { if (e.target === overlay) { haptic('light'); close(); } });
 
-  // Свайп вниз по шиту — закрытие.
+  // Свайп вниз по шиту — закрытие. Срабатывает только когда шит проскроллен
+  // в самый верх (иначе свайп = обычный скролл контента).
   let startY = null;
-  sheet.addEventListener('touchstart', (e) => { startY = e.touches[0].clientY; }, { passive: true });
+  sheet.addEventListener('touchstart', (e) => {
+    startY = sheet.scrollTop <= 0 ? e.touches[0].clientY : null;
+  }, { passive: true });
   sheet.addEventListener('touchend', (e) => {
     if (startY == null) return;
     const dy = e.changedTouches[0].clientY - startY;
