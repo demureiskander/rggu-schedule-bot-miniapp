@@ -801,7 +801,10 @@ h2 { font-size: 20px; }
   border-radius: 12px;
   overflow: hidden;
 }
-.toggle-list > .toggle-row { border-bottom: 1px solid var(--border); }
+.toggle-list > .toggle-row {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
 .toggle-list > .toggle-row:last-child { border-bottom: none; }
 
 /* Список ссылок (поддержать, о приложении). */
