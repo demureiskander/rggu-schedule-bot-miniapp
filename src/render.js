@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=14';
+} from './constants.js?v=15';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -182,11 +182,17 @@ export function weekNav(monday, onPrev, onNext) {
   return nav;
 }
 
-// Заголовок дня в недельном виде: «Понедельник, 16 июня».
-export function weekDayHeader(date, isToday) {
+// Заголовок дня в недельном виде: «Понедельник, 16 июня» (+ опц. погода справа).
+// weather = { code, temp } из weatherForDate; если null — справа ничего.
+export function weekDayHeader(date, isToday, weather = null) {
   const title = `${WEEKDAYS_FULL[date.getDay()]}, ${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()]}`;
   const cls = isToday ? 'week-day__head week-day__head--today' : 'week-day__head';
-  return h(`<div class="${cls}">${esc(title)}</div>`);
+  const head = h(`<div class="${cls}"><span class="week-day__title">${esc(title)}</span></div>`);
+  if (weather) {
+    const badge = weatherBadge(weather);
+    if (badge) head.appendChild(badge);
+  }
+  return head;
 }
 
 // Заголовок дня: ‹ «Среда, 16 июня» ›. onPrev/onNext листают день.
@@ -241,6 +247,17 @@ export function weatherBadge(weather) {
   const icon = WEATHER_ICONS[weather.code] || '';
   const temp = Number.isFinite(weather.temp) ? `${weather.temp > 0 ? '+' : ''}${weather.temp}°` : '';
   return h(`<div class="weather"><span class="weather__icon">${icon}</span><span class="weather__temp">${esc(temp)}</span></div>`);
+}
+
+// Ищет погоду на конкретный день в forecast.days. Возвращает {code,temp} или
+// null (день за пределами 16-дневного прогноза или forecast отсутствует).
+export function weatherForDate(forecast, date) {
+  if (!forecast || !Array.isArray(forecast.days)) return null;
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const key = `${yyyy}-${mm}-${dd}`;
+  return forecast.days.find((d) => d.date === key) || null;
 }
 
 // «ДД.ММ.ГГГГ» + слот → человекочитаемая дата «16 июня, 09:00».

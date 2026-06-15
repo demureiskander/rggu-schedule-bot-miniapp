@@ -1,15 +1,15 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=14';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=14';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=14';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=14';
-import { applyTheme } from './theme.js?v=14';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=14';
+import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=15';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=15';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=15';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=15';
+import { applyTheme } from './theme.js?v=15';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=15';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
-  counterText, weatherBadge, lessonDetail,
-} from './render.js?v=14';
+  counterText, weatherBadge, weatherForDate, lessonDetail,
+} from './render.js?v=15';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -492,16 +492,18 @@ export function renderSchedule(mount, params, router) {
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const isToday = selected.toDateString() === today.toDateString();
-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-    const isTomorrow = selected.toDateString() === tomorrow.toDateString();
     const { min, max } = rangeBounds();
     const todayInRange = today.getTime() >= min && today.getTime() <= max;
+    const layout = get.layout();
+    const isWeek = get.displayMode() === 'week';
 
-    // Шапка: погода (если включена, и только для сегодня/завтра) слева;
-    // справа — «Сегодня» (если не на сегодня) + шестерёнка.
+    // Шапка: погода (если включена и день в пределах 16-дневного прогноза)
+    // слева — только в режиме «по дням». В недельном виде погода уезжает в
+    // заголовки каждого дня (drawWeeklyBody).
     const top = h('<div class="sched-top"></div>');
-    const wEl = (get.weatherEnabled() && (isToday || isTomorrow)) ? weatherBadge(get.weather()) : null;
-    top.appendChild(wEl || h('<span></span>'));
+    const headerWeather = (!isWeek && get.weatherEnabled())
+      ? weatherBadge(weatherForDate(get.weather(), selected)) : null;
+    top.appendChild(headerWeather || h('<span></span>'));
     const right = h('<div class="sched-top__right"></div>');
     if (!isToday && todayInRange) {
       const todayBtn = h('<button class="today-btn">Сегодня</button>');
@@ -529,9 +531,6 @@ export function renderSchedule(mount, params, router) {
       next.setDate(next.getDate() + 1);
       t = next.getTime();
     }
-    const layout = get.layout();
-    const isWeek = get.displayMode() === 'week';
-
     // Полоска: в режиме «по неделям» подсвечиваем все 7 дней текущей недели мягким фоном.
     const monday = weekMonday(selected);
     const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 6);
@@ -595,13 +594,15 @@ export function renderSchedule(mount, params, router) {
     screen.appendChild(body);
     attachWeekSwipe(body);
 
+    const forecast = get.weatherEnabled() ? get.weather() : null;
     const wrap = h('<div class="week-days"></div>');
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday); d.setDate(monday.getDate() + i);
       const isTodayDay = d.toDateString() === today.toDateString();
       const dayLessons = schedule.byDate[tsToDateKey(d)] || [];
       const dayBlock = h('<div class="week-day"></div>');
-      dayBlock.appendChild(weekDayHeader(d, isTodayDay));
+      const dayWeather = forecast ? weatherForDate(forecast, d) : null;
+      dayBlock.appendChild(weekDayHeader(d, isTodayDay, dayWeather));
       if (!dayLessons.length) {
         dayBlock.appendChild(h('<div class="week-day__empty">Ничего</div>'));
       } else {

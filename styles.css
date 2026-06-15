@@ -544,6 +544,10 @@ h2 { font-size: 20px; }
 .week-days { display: flex; flex-direction: column; gap: var(--sp-5); }
 .week-day { display: flex; flex-direction: column; gap: var(--sp-2); }
 .week-day__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
   font-size: 15px;
   font-weight: 600;
   color: var(--text);
@@ -551,6 +555,9 @@ h2 { font-size: 20px; }
   border-bottom: 1px solid var(--border);
 }
 .week-day__head--today { color: var(--amber); border-bottom-color: var(--amber); }
+.week-day__title { min-width: 0; }
+.week-day__head .weather__icon { font-size: 14px; }
+.week-day__head .weather__temp { font-size: 12px; }
 .week-day__empty {
   font-size: 13px;
   color: var(--text-dim);

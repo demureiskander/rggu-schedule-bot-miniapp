@@ -5,7 +5,7 @@
 // Эндпоинты:
 //   GET /api/flows?form=<id>&course=<n>      -> [{ id, name, details }]
 //   GET /api/schedule?flow=<id>&form=<id>&course=<n> -> { item, tblData }
-//   GET /api/weather                         -> { date, code, temp }
+//   GET /api/weather                         -> { days: [{date,code,temp}*16], + date/code/temp (compat)
 //   GET /            (health-check)          -> { ok: true }
 //
 // Требует Node >= 18 (глобальные fetch / FormData / Blob).
@@ -102,18 +102,31 @@ async function getWeather() {
   if (weatherCache && now - weatherCache.fetchedAt < WEATHER_TTL_MS) {
     return weatherCache.data;
   }
+  // Daily-прогноз на 16 дней (максимум open-meteo). temperature_2m_max —
+  // дневной максимум; ставку на min/avg не делаем — пользователю важнее
+  // «насколько тепло будет».
   const url =
     'https://api.open-meteo.com/v1/forecast' +
-    '?latitude=55.75&longitude=37.62&current=weather_code,temperature_2m';
+    '?latitude=55.75&longitude=37.62' +
+    '&daily=weather_code,temperature_2m_max' +
+    '&timezone=Europe/Moscow&forecast_days=16';
   const res = await fetch(url);
   if (!res.ok) throw new Error(`open-meteo -> ${res.status}`);
   const json = await res.json();
-  const cur = json.current || {};
-  const data = {
-    date: (cur.time || new Date().toISOString()).slice(0, 10),
-    code: mapWeatherCode(Number(cur.weather_code)),
-    temp: Math.round(Number(cur.temperature_2m)),
-  };
+  const daily = json.daily || {};
+  const dates = Array.isArray(daily.time) ? daily.time : [];
+  const codes = Array.isArray(daily.weather_code) ? daily.weather_code : [];
+  const temps = Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max : [];
+  const days = dates.map((date, i) => ({
+    date,
+    code: mapWeatherCode(Number(codes[i])),
+    temp: Math.round(Number(temps[i])),
+  }));
+  // Обратная совместимость со старым фронтом: дублируем корневые date/code/temp
+  // с первого дня (фронт ?v<15 ждёт именно такой shape).
+  const data = days.length
+    ? { days, date: days[0].date, code: days[0].code, temp: days[0].temp }
+    : { days: [] };
   weatherCache = { data, fetchedAt: now };
   return data;
 }

@@ -2,8 +2,8 @@
 // Бот уже отдаёт нормализованный JSON (см. CLAUDE.md §4); здесь мы только
 // приводим расписание к удобной для рендера форме (карта по датам + тайм-слоты).
 
-import { API_BASE } from '../config.js?v=14';
-import { TIME_SLOTS } from './constants.js?v=14';
+import { API_BASE } from '../config.js?v=15';
+import { TIME_SLOTS } from './constants.js?v=15';
 
 // Унифицированный GET. Бросает Error при сетевой ошибке/не-2xx —
 // человекочитаемые сообщения для пользователя формируются в слое экранов.
@@ -116,12 +116,18 @@ export function tsToDateKey(date) {
 }
 
 // --- /api/weather ---
-// Возвращает { date, code, temp } или null (погода опциональна, не блокирует).
+// Возвращает { days: [{date,code,temp}*16] } или null (погода опциональна,
+// не блокирует). Старый shape с корневыми {date,code,temp} тоже принимаем
+// (если бэкенд ещё на одном дне) — нормализуем в `days`.
 export async function fetchWeather() {
   try {
     const w = await getJSON('/weather');
-    if (!w || !w.code) return null;
-    return { date: w.date, code: w.code, temp: w.temp };
+    if (!w) return null;
+    if (Array.isArray(w.days) && w.days.length) {
+      return { days: w.days.filter((d) => d && d.code) };
+    }
+    if (w.code) return { days: [{ date: w.date, code: w.code, temp: w.temp }] };
+    return null;
   } catch (_) {
     return null;
   }

@@ -55,9 +55,14 @@ index.html, styles.css
   - `lessontype`: `лек | сем | экзамен | спец | прочее`.
   - Время пар НЕ из API — берётся из `TIME_SLOTS` (constants.js).
   - `room: "-"` → показываем пусто, не дефис.
-- `GET /api/weather` → `{ "date":"ГГГГ-ММ-ДД", "code":"clear|clouds|rain|snow|fog|storm", "temp":18 }`
-  - Источник — open-meteo (Москва 55.75,37.62), без ключа, кэш в памяти на сутки.
+- `GET /api/weather` → `{ "days":[ {"date":"ГГГГ-ММ-ДД","code":"clear|clouds|rain|snow|fog|storm","temp":18} *16 ], "date","code","temp" }`
+  - Источник — open-meteo (Москва 55.75,37.62), `daily=weather_code,temperature_2m_max`,
+    `forecast_days=16`, `timezone=Europe/Moscow`. Без ключа, кэш в памяти на сутки.
+  - Корневые `date/code/temp` дублируют первый день — для совместимости со
+    старым фронтом, который ждал одиночный объект.
   - Маппинг WMO weather_code → code в `server/index.js` (mapWeatherCode).
+  - Фронт ищет погоду дня через `weatherForDate(forecast, date)`. По окну
+    прогноза — в любом дне; за пределами — просто не показываем.
   - Опционально. Упал запрос → просто не показываем.
 
 ## Дизайн-токены (финальная палитра Hi-Fi эталона)
