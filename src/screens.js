@@ -1,12 +1,12 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=6';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=6';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=6';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=6';
-import { applyTheme } from './theme.js?v=6';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=6';
-import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=6';
+import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=7';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=7';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=7';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=7';
+import { applyTheme } from './theme.js?v=7';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=7';
+import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=7';
 
 const LAYOUT_LABELS = { block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный' };
 
