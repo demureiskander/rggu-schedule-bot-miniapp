@@ -47,6 +47,18 @@ export function setBackVisible(visible) {
   else tg.BackButton.hide();
 }
 
+// --- Ссылки ---
+// t.me/… — открывается во внутреннем стеке Telegram.
+export function openTelegramLink(url) {
+  if (tg?.openTelegramLink) { try { tg.openTelegramLink(url); return; } catch (_) {} }
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+// Внешняя ссылка — открывается во встроенном браузере Telegram.
+export function openLink(url) {
+  if (tg?.openLink) { try { tg.openLink(url); return; } catch (_) {} }
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 // --- HapticFeedback ---
 export function haptic(style = 'light') {
   try {

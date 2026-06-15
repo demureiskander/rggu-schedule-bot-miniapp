@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=20';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=20';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=20';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=20';
-import { applyTheme } from './theme.js?v=20';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=20';
+} from './api.js?v=21';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=21';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=21';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=21';
+import { applyTheme } from './theme.js?v=21';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=21';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=20';
+} from './render.js?v=21';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -840,25 +840,45 @@ export function renderSchedule(mount, params, router) {
     }
     content.appendChild(segDM);
 
-    // Погода.
-    content.appendChild(toggleRow('Погода', get.weatherEnabled(), async (on) => {
+    // Оформление: тумблеры одной группой.
+    content.appendChild(h('<div class="settings__label">Оформление</div>'));
+    const appearance = h('<div class="toggle-list"></div>');
+    appearance.appendChild(toggleRow('Затемнять дни без пар', get.highlightEmptyDays(), async (on) => {
+      await set('highlightEmptyDays', on);
+      draw();
+    }));
+    appearance.appendChild(toggleRow('Погода', get.weatherEnabled(), async (on) => {
       await set('weatherEnabled', on);
       if (on) await ensureWeather();
       draw();
     }));
-
-    // Подсветка дней без пар.
-    content.appendChild(toggleRow('Затемнять дни без пар', get.highlightEmptyDays(), async (on) => {
-      await set('highlightEmptyDays', on);
-      draw();
-    }));
-
-    // Тема.
-    content.appendChild(toggleRow('Тёмная тема', get.theme() === 'dark', async (on) => {
+    appearance.appendChild(toggleRow('Тёмная тема', get.theme() === 'dark', async (on) => {
       const theme = on ? 'dark' : 'light';
       await set('theme', theme);
       applyTheme(theme);
     }));
+    content.appendChild(appearance);
+
+    // ── Разделитель функционального и информационного блоков ──
+    content.appendChild(h('<div class="settings__divider"></div>'));
+
+    // Поддержать проект.
+    content.appendChild(h('<div class="settings__label">Поддержать проект ☕</div>'));
+    content.appendChild(h('<div class="settings__hint">Если приложение полезно — буду рад поддержке</div>'));
+    const support = h('<div class="settings__list"></div>');
+    support.appendChild(linkRow('⭐', 'Telegram Stars', '', () => openTelegramLink('https://t.me/RsuhSpaceBot')));
+    support.appendChild(linkRow('💳', 'Cloudtips', '', () => openLink('https://pay.cloudtips.ru/p/b5c9b884')));
+    content.appendChild(support);
+
+    content.appendChild(h('<div class="settings__divider"></div>'));
+
+    // О приложении.
+    content.appendChild(h('<div class="settings__label">О приложении</div>'));
+    const about = h('<div class="settings__list"></div>');
+    about.appendChild(linkRow('📱', '@RsuhSpaceBot', 'наш бот', () => openTelegramLink('https://t.me/RsuhSpaceBot')));
+    about.appendChild(linkRow('✉️', '@textquestion', 'связаться', () => openTelegramLink('https://t.me/textquestion')));
+    about.appendChild(linkRow('📄', 'Соглашение · Конфиденциальность', '', () => openLink('#')));
+    content.appendChild(about);
 
     content.appendChild(h(`<div class="settings__version">Версия ${esc(APP_VERSION)} · ${esc(BOT_USERNAME)}</div>`));
 
@@ -986,6 +1006,23 @@ export function renderSchedule(mount, params, router) {
 
 // Сессионный кэш списка преподавателей (1600 шт., грузим один раз).
 let teachersCache = null;
+
+// Строка-ссылка для настроек (поддержать, о приложении). Иконка слева как
+// акцент, текст по центру, шеврон справа. onClick — обработчик нажатия.
+function linkRow(icon, label, sub, onClick) {
+  const row = h(`
+    <button class="link-row">
+      <span class="link-row__icon">${esc(icon)}</span>
+      <span class="link-row__text">
+        <span class="link-row__label">${esc(label)}</span>
+        ${sub ? `<span class="link-row__sub">${esc(sub)}</span>` : ''}
+      </span>
+      <span class="link-row__chev">›</span>
+    </button>
+  `);
+  row.addEventListener('click', () => { haptic('light'); onClick(); });
+  return row;
+}
 
 // Строка-тумблер для настроек. onChange(boolean).
 function toggleRow(label, on, onChange) {

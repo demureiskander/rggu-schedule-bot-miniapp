@@ -752,3 +752,48 @@ h2 { font-size: 20px; }
 @media (prefers-reduced-motion: reduce) {
   .teacher-row { animation: none; }
 }
+
+/* ============== Настройки: блоки тумблеров, разделитель, ссылки ============== */
+/* Группа тумблеров в едином карточном контейнере. */
+.toggle-list {
+  display: flex; flex-direction: column;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.toggle-list > .toggle-row { border-bottom: 1px solid var(--border); }
+.toggle-list > .toggle-row:last-child { border-bottom: none; }
+
+/* Список ссылок (поддержать, о приложении). */
+.settings__list {
+  display: flex; flex-direction: column;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.settings__hint { font-size: 12px; color: var(--text-muted); padding: 4px 2px 8px; }
+.settings__divider { height: 1px; background: var(--border); margin: 18px 0; }
+
+.link-row {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  transition: filter .12s ease, transform .12s ease;
+}
+.settings__list > .link-row:last-child { border-bottom: none; }
+.link-row:hover { filter: brightness(1.08); }
+.link-row:active { filter: brightness(.9); transform: scale(0.99); }
+.link-row__icon { font-size: 18px; line-height: 1; width: 22px; text-align: center; }
+.link-row__text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.link-row__label { font-size: 14px; font-weight: 500; }
+.link-row__sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.link-row__chev { color: var(--text-dim); font-size: 18px; line-height: 1; }
