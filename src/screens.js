@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=17';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=17';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=17';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=17';
-import { applyTheme } from './theme.js?v=17';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=17';
+} from './api.js?v=18';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=18';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=18';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=18';
+import { applyTheme } from './theme.js?v=18';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=18';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=17';
+} from './render.js?v=18';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -937,8 +937,12 @@ export function renderSchedule(mount, params, router) {
         return;
       }
       status.textContent = `Найдено: ${found.length}${found.length === 80 ? '+ (уточни запрос)' : ''}`;
-      for (const t of found) {
-        const row = h(`<button class="option-row"><span class="option-row__label">${esc(t.name)}</span></button>`);
+      for (let i = 0; i < found.length; i++) {
+        const t = found[i];
+        // Staggered fade-in + slide-up: первые 10 строк с задержкой 30ms друг
+        // за другом (общая «волна» ~300ms), остальные появляются разом.
+        const delay = i < 10 ? i * 30 : 0;
+        const row = h(`<button class="option-row teacher-row" style="animation-delay:${delay}ms"><span class="option-row__label">${esc(t.name)}</span></button>`);
         row.addEventListener('click', () => {
           hapticSelection();
           closeSheet();

@@ -740,3 +740,13 @@ h2 { font-size: 20px; }
 .teacher-search__input input:focus { border-color: var(--primary); }
 .teacher-search__status { color: var(--text-muted); min-height: 18px; }
 .teacher-search__list { display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow-y: auto; }
+
+/* Staggered появление строк поиска преподавателя. */
+@keyframes teacher-row-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.teacher-row { animation: teacher-row-in 150ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .teacher-row { animation: none; }
+}
