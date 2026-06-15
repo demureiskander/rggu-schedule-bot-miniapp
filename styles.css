@@ -391,11 +391,23 @@ h2 { font-size: 20px; }
 /* Недельный режим: одна общая pill-плашка за всеми 7 днями недели вместо
    отдельных подсвеченных кружков. Сегодняшний/выбранный кружки остаются
    поверх плашки (их собственные стили __num выигрывают по специфичности). */
+/* Pill — это фон только за рядом чисел; ярлыки «Пн/Вт/…» остаются под плашкой.
+   Реализовано через ::before, чтобы высота плашки не растягивалась на весь
+   .day-cell (он содержит и __num, и __dow), а ограничивалась рядом чисел. */
 .week-strip__pill {
+  position: relative;
   display: flex;
   gap: 4px;
+  isolation: isolate;
+}
+.week-strip__pill::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 4px;
+  height: 48px;
   background: var(--surface-2);
   border-radius: 999px;
+  z-index: -1;
 }
 .week-strip--weekly .day-cell--in-range:not(.day-cell--today):not(.day-cell--sel) .day-cell__num {
   background: transparent;
