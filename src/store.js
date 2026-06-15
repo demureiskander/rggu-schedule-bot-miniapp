@@ -2,12 +2,12 @@
 // Persistence: Telegram CloudStorage (синхронизируется между устройствами) с
 // fallback на localStorage. В памяти держим текущее состояние и кэш расписания.
 
-import { cloudGet, cloudSet, hasCloudStorage } from './telegram.js?v=12';
+import { cloudGet, cloudSet, hasCloudStorage } from './telegram.js?v=13';
 
 const LS_PREFIX = 'rsuhspace:';
 
 // Ключи, которые персистим.
-const PERSIST_KEYS = ['group', 'layout', 'theme', 'weatherEnabled', 'highlightEmptyDays'];
+const PERSIST_KEYS = ['group', 'layout', 'displayMode', 'theme', 'weatherEnabled', 'highlightEmptyDays'];
 
 // Ключи, реально найденные в хранилище при loadState (для «первого запуска»).
 const persistedKeys = new Set();
@@ -15,7 +15,8 @@ const persistedKeys = new Set();
 // Состояние в памяти.
 const state = {
   group: null,            // { form, year, id, name, details }
-  layout: 'block',        // 'block' | 'compact' | 'ribbon' | 'weekly'
+  layout: 'block',        // 'block' | 'compact' | 'ribbon' (рендер одной пары)
+  displayMode: 'day',     // 'day' | 'week' (что показывать — один день или неделю)
   theme: 'dark',          // 'dark' | 'light'
   weatherEnabled: false,  // boolean
   highlightEmptyDays: true, // boolean — серое выделение дней без пар
@@ -68,6 +69,9 @@ function deserialize(key, raw) {
     try { return JSON.parse(raw); } catch (_) { return undefined; }
   }
   if (key === 'weatherEnabled' || key === 'highlightEmptyDays') return raw === 'true';
+  // Миграция: раньше «недельный вид» был четвёртым layout. Теперь это
+  // отдельный displayMode='week' — нужно превратить старое значение.
+  if (key === 'layout' && raw === 'weekly') return 'block';
   return raw;
 }
 
@@ -75,13 +79,22 @@ function deserialize(key, raw) {
 
 // Загружает персистентные поля в state. Вызывать один раз на старте.
 export async function loadState() {
+  let legacyWeekly = false;
   for (const key of PERSIST_KEYS) {
     const raw = await readPersisted(key);
+    if (key === 'layout' && raw === 'weekly') legacyWeekly = true;
     const value = deserialize(key, raw);
     if (value !== undefined) {
       state[key] = value;
       persistedKeys.add(key);
     }
+  }
+  // Миграция: пользователи со старым layout='weekly' переезжают на
+  // displayMode='week' (если он явно ещё не задан) — сохраняем намерение.
+  if (legacyWeekly && !persistedKeys.has('displayMode')) {
+    state.displayMode = 'week';
+    persistedKeys.add('displayMode');
+    await writePersisted('displayMode', 'week');
   }
   return getState();
 }
@@ -100,6 +113,7 @@ export function getState() {
 export const get = {
   group: () => state.group,
   layout: () => state.layout,
+  displayMode: () => state.displayMode,
   theme: () => state.theme,
   weatherEnabled: () => state.weatherEnabled,
   highlightEmptyDays: () => state.highlightEmptyDays,

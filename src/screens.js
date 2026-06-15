@@ -1,19 +1,20 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=12';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=12';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=12';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=12';
-import { applyTheme } from './theme.js?v=12';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=12';
+import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=13';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=13';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=13';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=13';
+import { applyTheme } from './theme.js?v=13';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=13';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, lessonDetail,
-} from './render.js?v=12';
+} from './render.js?v=13';
 
 const LAYOUT_LABELS = {
-  block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный', weekly: 'Недельный',
+  block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
 };
+const DISPLAY_MODE_LABELS = { day: 'По дням', week: 'По неделям' };
 
 // --- DOM-хелперы ---
 function h(html) {
@@ -437,7 +438,7 @@ export function renderSchedule(mount, params, router) {
     draw();
   }
 
-  // Перелистывание недели (для weekly): сдвиг на ±7 дней, прижатие к границам.
+  // Перелистывание недели (в режиме «по неделям»): сдвиг ±7 дней с прижатием к границам.
   function changeWeek(delta) {
     const next = new Date(selected);
     next.setDate(next.getDate() + delta * 7);
@@ -509,19 +510,19 @@ export function renderSchedule(mount, params, router) {
       t = next.getTime();
     }
     const layout = get.layout();
-    const isWeekly = layout === 'weekly';
+    const isWeek = get.displayMode() === 'week';
 
-    // Полоска: в недельном виде подсвечиваем все 7 дней текущей недели мягким фоном.
+    // Полоска: в режиме «по неделям» подсвечиваем все 7 дней текущей недели мягким фоном.
     const monday = weekMonday(selected);
     const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 6);
     const inCurrentWeek = (d) => d.getTime() >= monday.getTime() && d.getTime() <= sunday.getTime();
     screen.appendChild(weekStrip(days, selected, selectDate, {
       hasLessons, dimEmpty: get.highlightEmptyDays(),
-      inRange: isWeekly ? inCurrentWeek : null,
+      inRange: isWeek ? inCurrentWeek : null,
     }));
 
-    if (isWeekly) {
-      drawWeeklyBody(monday);
+    if (isWeek) {
+      drawWeeklyBody(monday, layout);
       return;
     }
 
@@ -553,9 +554,9 @@ export function renderSchedule(mount, params, router) {
     body.appendChild(list);
   }
 
-  // Недельный вид: 7 дней друг под другом, шапки + список пар (renderLesson
-  // блочный). Свайп влево/вправо и стрелки в weekNav листают неделю.
-  function drawWeeklyBody(monday) {
+  // Недельный режим отображения: 7 дней друг под другом, шапки + список пар
+  // (renderLesson с выбранным layout). Свайп/стрелки в weekNav листают неделю.
+  function drawWeeklyBody(monday, layout) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     screen.appendChild(weekNav(monday, () => changeWeek(-1), () => changeWeek(1)));
 
@@ -582,9 +583,9 @@ export function renderSchedule(mount, params, router) {
       if (!dayLessons.length) {
         dayBlock.appendChild(h('<div class="week-day__empty">Ничего</div>'));
       } else {
-        const list = h('<div class="lessons lessons--block"></div>');
+        const list = h(`<div class="lessons lessons--${layout}"></div>`);
         for (const lesson of dayLessons) {
-          const el = renderLesson(lesson, 'block');
+          const el = renderLesson(lesson, layout);
           const card = el.matches('button') ? el : el.querySelector('button') || el;
           card.addEventListener('click', () => openDetail(lesson));
           list.appendChild(el);
@@ -736,10 +737,10 @@ export function renderSchedule(mount, params, router) {
     });
     content.appendChild(groupRow);
 
-    // Вид расписания.
+    // Вид расписания (как рендерится одна пара).
     content.appendChild(h('<div class="settings__label">Вид расписания</div>'));
     const seg = h('<div class="segmented"></div>');
-    for (const key of ['block', 'compact', 'ribbon', 'weekly']) {
+    for (const key of ['block', 'compact', 'ribbon']) {
       const chip = h(`<button class="seg${get.layout() === key ? ' seg--on' : ''}">${LAYOUT_LABELS[key]}</button>`);
       chip.addEventListener('click', async () => {
         hapticSelection();
@@ -751,6 +752,22 @@ export function renderSchedule(mount, params, router) {
       seg.appendChild(chip);
     }
     content.appendChild(seg);
+
+    // Отображение (что в окне — один день или вся неделя).
+    content.appendChild(h('<div class="settings__label">Отображение</div>'));
+    const segDM = h('<div class="segmented"></div>');
+    for (const key of ['day', 'week']) {
+      const chip = h(`<button class="seg${get.displayMode() === key ? ' seg--on' : ''}">${DISPLAY_MODE_LABELS[key]}</button>`);
+      chip.addEventListener('click', async () => {
+        hapticSelection();
+        await set('displayMode', key);
+        segDM.querySelectorAll('.seg').forEach((c) => c.classList.remove('seg--on'));
+        chip.classList.add('seg--on');
+        draw();
+      });
+      segDM.appendChild(chip);
+    }
+    content.appendChild(segDM);
 
     // Погода.
     content.appendChild(toggleRow('Погода', get.weatherEnabled(), async (on) => {
