@@ -403,8 +403,8 @@ h2 { font-size: 20px; }
 .week-strip__pill::before {
   content: '';
   position: absolute;
-  left: 0; right: 0; top: 4px;
-  height: 48px;
+  left: 0; right: 0; top: 6px;
+  height: 40px;
   background: var(--surface-2);
   border-radius: 999px;
   z-index: -1;
