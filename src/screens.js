@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=18';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=18';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=18';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=18';
-import { applyTheme } from './theme.js?v=18';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=18';
+} from './api.js?v=19';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=19';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=19';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=19';
+import { applyTheme } from './theme.js?v=19';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=19';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=18';
+} from './render.js?v=19';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -924,19 +924,40 @@ export function renderSchedule(mount, params, router) {
     }
     status.textContent = `Введи 2+ символа (всего ${teachers.length})`;
 
+    // Каждая смена состояния (статус-строка/контейнер списка) — мягкое появление
+    // через Web Animations API. Прерывает предыдущее, не плодит классы и сбросы.
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const softIn = (el) => {
+      if (!el || reduceMotion) return;
+      el.animate(
+        [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }],
+        { duration: 200, easing: 'ease-out' },
+      );
+    };
+    const setStatus = (text) => {
+      if (status.textContent === text) return;
+      status.textContent = text;
+      softIn(status);
+    };
+
     const renderList = () => {
       const q = input.value.trim().toLowerCase();
+      const hadRows = list.children.length > 0;
       list.innerHTML = '';
       if (q.length < 2) {
-        status.textContent = `Введи 2+ символа (всего ${teachers.length})`;
+        setStatus(`Введи 2+ символа (всего ${teachers.length})`);
         return;
       }
       const found = teachers.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 80);
       if (!found.length) {
-        status.textContent = 'Никого не нашлось';
+        setStatus('Никого не нашлось');
         return;
       }
-      status.textContent = `Найдено: ${found.length}${found.length === 80 ? '+ (уточни запрос)' : ''}`;
+      setStatus(`Найдено: ${found.length}${found.length === 80 ? '+ (уточни запрос)' : ''}`);
+      // Контейнер списка плавно появляется при переходе «нет строк → есть строки»;
+      // при поверх-фильтрации (строки уже были) не анимируем контейнер — за
+      // плавность отвечает staggered-анимация самих строк.
+      if (!hadRows) softIn(list);
       for (let i = 0; i < found.length; i++) {
         const t = found[i];
         // Staggered fade-in + slide-up: первые 10 строк с задержкой 30ms друг
