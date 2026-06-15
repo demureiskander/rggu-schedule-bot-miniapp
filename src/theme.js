@@ -3,7 +3,7 @@
 // и тумблер в настройках читают/пишут одно и то же значение — без расхождения
 // CSS и состояния.
 
-import { get } from './store.js?v=8';
+import { get } from './store.js?v=9';
 
 // Применяет тему к документу (CSS-токены висят на [data-theme]).
 export function applyTheme(theme) {

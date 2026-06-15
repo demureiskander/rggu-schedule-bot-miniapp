@@ -1,12 +1,12 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=8';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=8';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=8';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=8';
-import { applyTheme } from './theme.js?v=8';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=8';
-import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=8';
+import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=9';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=9';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=9';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=9';
+import { applyTheme } from './theme.js?v=9';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=9';
+import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=9';
 
 const LAYOUT_LABELS = { block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный' };
 
@@ -478,10 +478,20 @@ export function renderSchedule(mount, params, router) {
     screen.appendChild(top);
 
     // Полоска дней — горизонтальный скролл по всему загруженному диапазону.
-    // Пустые дни (если включено) — приглушены; сегодня — жёлтый; выбранный
-    // день центрируется (плавно при навигации, мгновенно при первой отрисовке).
+    // Дни генерируем сплошным интервалом от min до max (включая дни без пар
+    // и «сегодня» даже если без пар); пустые дни приглушены, сегодня — жёлтый;
+    // выбранный день центрируется (плавно при навигации, мгновенно при первой
+    // отрисовке). Если «сегодня» лежит между min..max, оно гарантированно
+    // оказывается в ленте — иначе кнопка «Сегодня» не имела бы куда прыгнуть.
     const hasLessons = (d) => (schedule.byDate[tsToDateKey(d)] || []).length > 0;
-    const days = schedule.dates.map((k) => new Date(dateKeyToTs(k)));
+    const days = [];
+    for (let t = min; t <= max; ) {
+      const d = new Date(t);
+      days.push(d);
+      const next = new Date(d);
+      next.setDate(next.getDate() + 1);
+      t = next.getTime();
+    }
     screen.appendChild(weekStrip(days, selected, selectDate, {
       hasLessons, dimEmpty: get.highlightEmptyDays(),
       scrollBehavior: firstDraw ? 'auto' : 'smooth',
