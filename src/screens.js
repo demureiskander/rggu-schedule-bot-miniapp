@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=31';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=31';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=31';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=31';
-import { applyTheme } from './theme.js?v=31';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=31';
+} from './api.js?v=32';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=32';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=32';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=32';
+import { applyTheme } from './theme.js?v=32';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=32';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=31';
+} from './render.js?v=32';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -894,7 +894,7 @@ export function renderSchedule(mount, params, router) {
   function createFab() {
     const icon = isTeacher
       ? '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
-      : '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19.5c0-4 11-4 11 0"/><circle cx="17" cy="17" r="3"/><path d="M19.3 19.3l2.4 2.4"/></svg>';
+      : '<svg viewBox="0 0 495 524" width="24" height="24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M349.212 280.149C369.179 278.747 392.282 285.678 409.047 296.437C432.712 311.879 449.189 336.17 454.792 363.87C460.903 393.175 453.739 420.967 437.47 445.606L442.846 447.958C453.102 452.446 472.512 477.409 482.67 485.431C492.938 493.544 500.102 507.29 488.995 518.342C485.475 521.856 480.693 523.81 475.715 523.761C472.237 523.749 468.832 522.708 465.942 520.773C460.873 517.43 435.964 491.812 429.669 485.603C421.256 477.643 420.392 477.318 418.041 465.972C400.523 478.53 384.316 486.699 362.42 488.481C334.395 491.015 306.534 482.1 285.189 463.755C264.188 445.637 251.286 419.877 249.363 392.201C247.392 363.888 256.858 335.967 275.644 314.695C295.084 292.401 320.152 282.115 349.212 280.149ZM426.437 381.523C424.716 341.123 390.696 309.693 350.29 311.175C309.548 312.669 277.799 347.031 279.532 387.762C281.259 428.498 315.812 460.044 356.536 458.072C396.924 456.119 428.151 421.922 426.437 381.523Z"/><path d="M133.119 317.487C143.097 316.207 152.06 323.457 162.63 326.537C193.467 335.525 214.659 334.515 244.766 326.726C236.763 343.602 231.436 358.089 230.297 376.984C227.315 426.293 252.236 468.273 293.976 492.869C257.348 493.641 218.779 493.034 182.007 493.022L74.3955 493.053L42.4638 493.084C31.2035 493.096 18.9097 494.627 9.8898 487.15C4.34294 482.558 0.587037 475.67 0.184753 468.512C-1.74646 434.149 11.6122 397.503 33.2345 371.07C58.0727 340.626 94.0211 321.344 133.119 317.487Z"/><path d="M200.906 0.115119C206.105 -0.330027 208.58 0.510676 213.262 2.72661C267.28 28.3001 321.077 54.38 374.953 80.2652C377.164 81.3281 379.601 82.7934 381.248 84.6138C381.603 88.5081 380.354 89.4167 377.041 91.0497C357.325 100.765 337.395 110.093 317.538 119.525L207.056 172C206.26 172.081 205.467 172.154 204.667 172.185C202.233 172.277 200.235 171.469 198.029 170.532C174.868 160.693 150.519 147.951 127.586 137.032C114.611 130.854 33.5262 93.7108 28.6541 88.9477C27.2617 87.5865 26.9965 86.5872 27.0082 84.6879C32.9059 79.6768 57.891 68.5224 66.219 64.5871L120.728 38.555L172.503 13.456C181.284 9.21521 191.97 3.71608 200.906 0.115119Z"/><path d="M97.6624 143.735L162.336 174.689C173.328 179.964 184.367 185.481 195.577 190.266C203.061 193.46 207.455 192.603 214.67 189.302C223.383 185.316 232.035 181.109 240.705 176.985C263.93 165.786 287.228 154.729 310.588 143.811C313.147 149.656 315.296 155.673 317.017 161.82C325.84 194.065 319.827 223.592 303.65 252.17C289.739 273.267 273.335 288.14 249.865 298.145C221.357 310.165 189.268 310.514 160.504 299.119C131.743 287.632 108.752 265.144 96.6245 236.645C83.3167 204.895 84.9558 175.101 97.6624 143.735Z"/></svg>';
     const el = h(`<button class="fab" aria-label="${isTeacher ? 'Закрыть' : 'Поиск преподавателя'}">${icon}</button>`);
     el.addEventListener('click', () => {
       haptic('light');
