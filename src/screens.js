@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=36';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=36';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=36';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=36';
-import { applyTheme } from './theme.js?v=36';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=36';
+} from './api.js?v=37';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=37';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=37';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=37';
+import { applyTheme } from './theme.js?v=37';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=37';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=36';
+} from './render.js?v=37';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -530,6 +530,31 @@ export function renderSchedule(mount, params, router) {
     screen.innerHTML = '';
     // Расписание готово — открываем FAB (если был скрыт скроллом — тоже сбрасываем).
     fab.el.classList.remove('fab--gone', 'fab--hidden');
+
+    // Пустое расписание (часто у преподов, которые сейчас не ведут): не строим
+    // ленту дней (был бы Invalid Date на ±Infinity границах) — рисуем баннер
+    // teacher-режима + дружелюбный mascot. Внутри teacher тут же даём «Вернуться».
+    if (!schedule.dates.length) {
+      if (isTeacher) {
+        const banner = h(`
+          <div class="teacher-banner">
+            <div class="teacher-banner__text">
+              <div class="teacher-banner__label">Расписание преподавателя</div>
+              <div class="teacher-banner__name">${esc(schedule.item || teacher.name)}</div>
+            </div>
+            <button class="teacher-banner__back link-amber" type="button">Вернуться</button>
+          </div>
+        `);
+        banner.querySelector('button').addEventListener('click', () => { haptic('light'); router.back(); });
+        screen.appendChild(banner);
+      }
+      screen.appendChild(mascotBlock({
+        pose: 'sleep',
+        title: isTeacher ? 'Сейчас занятий нет' : 'В семестре пар нет',
+        subtitle: isTeacher ? 'У преподавателя пусто в расписании.' : 'Похоже, у группы пока ничего не загружено.',
+      }));
+      return;
+    }
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const isToday = selected.toDateString() === today.toDateString();
