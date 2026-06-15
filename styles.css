@@ -710,6 +710,8 @@ h2 { font-size: 20px; }
 .fab:hover { filter: brightness(1.08); }
 .fab:active { filter: brightness(.9); transform: scale(0.96); }
 .fab--hidden { transform: translateY(110px); opacity: 0; pointer-events: none; }
+/* Расписание ещё не нарисовано (загрузка / ошибка / иное состояние). */
+.fab--gone { display: none; }
 
 /* ============== Баннер режима преподавателя ============== */
 .teacher-banner {

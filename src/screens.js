@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=19';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=19';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=19';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=19';
-import { applyTheme } from './theme.js?v=19';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=19';
+} from './api.js?v=20';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=20';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=20';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=20';
+import { applyTheme } from './theme.js?v=20';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=20';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=19';
+} from './render.js?v=20';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -381,7 +381,9 @@ export function renderSchedule(mount, params, router) {
   const screen = h('<section class="schedule"></section>');
   mount.appendChild(screen);
   // FAB (лупа/закрыть) — вне screen, чтобы перерисовка draw() его не убивала.
+  // Стартует скрытой; показываем только когда расписание реально нарисовано.
   const fab = createFab();
+  fab.el.classList.add('fab--gone');
   mount.appendChild(fab.el);
 
   let schedule = null;
@@ -391,6 +393,7 @@ export function renderSchedule(mount, params, router) {
 
   async function load() {
     screen.innerHTML = '';
+    fab.el.classList.add('fab--gone');
     screen.appendChild(mascotBlock({ pose: 'think', title: 'Загружаю расписание…', spinner: true }));
     try {
       let data;
@@ -414,6 +417,7 @@ export function renderSchedule(mount, params, router) {
 
   function renderError() {
     screen.innerHTML = '';
+    fab.el.classList.add('fab--gone');
     const actions = isTeacher
       ? [
           { label: 'Попробовать снова', onClick: load },
@@ -511,6 +515,8 @@ export function renderSchedule(mount, params, router) {
 
   function draw() {
     screen.innerHTML = '';
+    // Расписание готово — открываем FAB (если был скрыт скроллом — тоже сбрасываем).
+    fab.el.classList.remove('fab--gone', 'fab--hidden');
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const isToday = selected.toDateString() === today.toDateString();
