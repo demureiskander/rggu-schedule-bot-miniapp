@@ -2,8 +2,8 @@
 // Бот уже отдаёт нормализованный JSON (см. CLAUDE.md §4); здесь мы только
 // приводим расписание к удобной для рендера форме (карта по датам + тайм-слоты).
 
-import { API_BASE } from '../config.js?v=16';
-import { TIME_SLOTS } from './constants.js?v=16';
+import { API_BASE } from '../config.js?v=17';
+import { TIME_SLOTS } from './constants.js?v=17';
 
 // Унифицированный GET. Бросает Error при сетевой ошибке/не-2xx —
 // человекочитаемые сообщения для пользователя формируются в слое экранов.
@@ -54,6 +54,23 @@ export async function fetchSchedule(flowId, formCode, course) {
     `&course=${encodeURIComponent(course)}`;
   const data = await getJSON(`/schedule${q}`);
   return normalizeSchedule(data);
+}
+
+// Расписание преподавателя по его id (поле id из /api/teachers).
+// shape — тот же normalizeSchedule, что и для группы.
+export async function fetchTeacherSchedule(teacherId) {
+  const q = `?mode=teacher&teacher=${encodeURIComponent(teacherId)}`;
+  const data = await getJSON(`/schedule${q}`);
+  return normalizeSchedule(data);
+}
+
+// Список преподавателей. Грузить один раз на сессию (1600 шт.).
+export async function fetchTeachers() {
+  const data = await getJSON('/teachers');
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((t) => ({ id: String(t.id ?? ''), name: clean(t.name) }))
+    .filter((t) => t.id && t.name);
 }
 
 function normalizeSchedule(data) {

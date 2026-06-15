@@ -1,15 +1,18 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=16';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=16';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=16';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=16';
-import { applyTheme } from './theme.js?v=16';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=16';
+import {
+  fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
+  fetchWeather, tsToDateKey, dateKeyToTs,
+} from './api.js?v=17';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=17';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=17';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=17';
+import { applyTheme } from './theme.js?v=17';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=17';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=16';
+} from './render.js?v=17';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -369,9 +372,17 @@ function renderPickerGroup(mount, params, router) {
 // 6.3 Расписание: общая шапка + 3 вида + состояния + sheets
 // =========================================================
 export function renderSchedule(mount, params, router) {
-  const group = params.group;
+  // Два режима: своя группа (params.group) и просмотр преподавателя (params.teacher).
+  // Преподавательский режим временный — не персистится, отдельный экран
+  // (push в стек), возврат через BackButton, FAB (✕) или кнопку в баннере.
+  const teacher = params.teacher || null;
+  const isTeacher = Boolean(teacher);
+  const group = isTeacher ? null : params.group;
   const screen = h('<section class="schedule"></section>');
   mount.appendChild(screen);
+  // FAB (лупа/закрыть) — вне screen, чтобы перерисовка draw() его не убивала.
+  const fab = createFab();
+  mount.appendChild(fab.el);
 
   let schedule = null;
   let selected = null; // Date
@@ -382,10 +393,15 @@ export function renderSchedule(mount, params, router) {
     screen.innerHTML = '';
     screen.appendChild(mascotBlock({ pose: 'think', title: 'Загружаю расписание…', spinner: true }));
     try {
-      let data = getFreshSchedule(group.id);
-      if (!data) {
-        data = await fetchSchedule(group.id, group.form, group.year);
-        setScheduleFor(group.id, data);
+      let data;
+      if (isTeacher) {
+        data = await fetchTeacherSchedule(teacher.id);
+      } else {
+        data = getFreshSchedule(group.id);
+        if (!data) {
+          data = await fetchSchedule(group.id, group.form, group.year);
+          setScheduleFor(group.id, data);
+        }
       }
       schedule = data;
       selected = pickInitialDate(data);
@@ -398,14 +414,20 @@ export function renderSchedule(mount, params, router) {
 
   function renderError() {
     screen.innerHTML = '';
+    const actions = isTeacher
+      ? [
+          { label: 'Попробовать снова', onClick: load },
+          { label: 'Вернуться к моему расписанию', variant: 'ghost', onClick: () => router.back() },
+        ]
+      : [
+          { label: 'Попробовать снова', onClick: load },
+          { label: 'Выбрать другую группу', variant: 'ghost', onClick: () => router.reset('picker', { step: 'form' }) },
+        ];
     screen.appendChild(mascotBlock({
       pose: 'sad',
       title: 'Что-то пошло не так',
       subtitle: 'Не удалось загрузить расписание. Проверь подключение к интернету.',
-      actions: [
-        { label: 'Попробовать снова', onClick: load },
-        { label: 'Выбрать другую группу', variant: 'ghost', onClick: () => router.reset('picker', { step: 'form' }) },
-      ],
+      actions,
     }));
   }
 
@@ -497,6 +519,21 @@ export function renderSchedule(mount, params, router) {
     const layout = get.layout();
     const isWeek = get.displayMode() === 'week';
 
+    // Баннер режима преподавателя — отличает от своего расписания.
+    if (isTeacher) {
+      const banner = h(`
+        <div class="teacher-banner">
+          <div class="teacher-banner__text">
+            <div class="teacher-banner__label">Расписание преподавателя</div>
+            <div class="teacher-banner__name">${esc(schedule.item || teacher.name)}</div>
+          </div>
+          <button class="teacher-banner__back link-amber" type="button">Вернуться</button>
+        </div>
+      `);
+      banner.querySelector('button').addEventListener('click', () => { haptic('light'); router.back(); });
+      screen.appendChild(banner);
+    }
+
     // Шапка: погода (если включена и день в пределах 16-дневного прогноза)
     // слева — только в режиме «по дням». В недельном виде погода уезжает в
     // заголовки каждого дня (drawWeeklyBody).
@@ -566,7 +603,7 @@ export function renderSchedule(mount, params, router) {
 
     const list = h(`<div class="lessons lessons--${layout}"></div>`);
     for (const lesson of lessons) {
-      const el = renderLesson(lesson, layout);
+      const el = renderLesson(lesson, layout, isTeacher ? 'teacher' : 'group');
       const card = el.matches('button') ? el : el.querySelector('button') || el;
       card.addEventListener('click', () => openDetail(lesson));
       list.appendChild(el);
@@ -608,7 +645,7 @@ export function renderSchedule(mount, params, router) {
       } else {
         const list = h(`<div class="lessons lessons--${layout}"></div>`);
         for (const lesson of dayLessons) {
-          const el = renderLesson(lesson, layout);
+          const el = renderLesson(lesson, layout, isTeacher ? 'teacher' : 'group');
           const card = el.matches('button') ? el : el.querySelector('button') || el;
           card.addEventListener('click', () => openDetail(lesson));
           list.appendChild(el);
@@ -737,7 +774,10 @@ export function renderSchedule(mount, params, router) {
   // --- Sheet: детали пары (6.7) ---
   function openDetail(lesson) {
     haptic('light');
-    openSheet(lessonDetail(lesson, subjectStats(lesson.subject, lesson)), router);
+    openSheet(
+      lessonDetail(lesson, subjectStats(lesson.subject, lesson), isTeacher ? 'teacher' : 'group'),
+      router,
+    );
   }
 
   // --- Sheet: настройки (6.6) ---
@@ -746,19 +786,21 @@ export function renderSchedule(mount, params, router) {
     const content = h('<div class="settings"></div>');
     content.appendChild(h('<div class="sheet__title">Настройки</div>'));
 
-    // Группа.
-    content.appendChild(h('<div class="settings__label">Группа</div>'));
-    const groupRow = h(`
-      <div class="settings__group">
-        <div><div class="settings__group-name">${esc(group.name)}</div>
-        ${group.details ? `<div class="settings__group-sub">${esc(group.details)}</div>` : ''}</div>
-        <button class="link-amber">Сменить</button>
-      </div>
-    `);
-    groupRow.querySelector('.link-amber').addEventListener('click', () => {
-      close(); router.reset('picker', { step: 'form' });
-    });
-    content.appendChild(groupRow);
+    // Группа — только в режиме своей группы (в teacher-режиме её просто нет).
+    if (!isTeacher && group) {
+      content.appendChild(h('<div class="settings__label">Группа</div>'));
+      const groupRow = h(`
+        <div class="settings__group">
+          <div><div class="settings__group-name">${esc(group.name)}</div>
+          ${group.details ? `<div class="settings__group-sub">${esc(group.details)}</div>` : ''}</div>
+          <button class="link-amber">Сменить</button>
+        </div>
+      `);
+      groupRow.querySelector('.link-amber').addEventListener('click', () => {
+        close(); router.reset('picker', { step: 'form' });
+      });
+      content.appendChild(groupRow);
+    }
 
     // Вид расписания (как рендерится одна пара).
     content.appendChild(h('<div class="settings__label">Вид расписания</div>'));
@@ -816,7 +858,103 @@ export function renderSchedule(mount, params, router) {
 
     const close = openSheet(content, router);
   }
+
+  // FAB: лупа (в режиме группы) / ✕ (в режиме преподавателя).
+  // Прячется при скролле вниз, выезжает при скролле вверх. Живёт на mount,
+  // а не на screen — draw() не пересоздаёт.
+  function createFab() {
+    const icon = isTeacher
+      ? '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+      : '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+    const el = h(`<button class="fab" aria-label="${isTeacher ? 'Закрыть' : 'Поиск преподавателя'}">${icon}</button>`);
+    el.addEventListener('click', () => {
+      haptic('light');
+      if (isTeacher) router.back();
+      else openTeacherSearch();
+    });
+
+    // Скролл-аутохайд. Источник скролла — window.
+    let lastY = window.scrollY;
+    let hidden = false;
+    const onScroll = () => {
+      if (!el.isConnected) { window.removeEventListener('scroll', onScroll); return; }
+      const y = window.scrollY;
+      const dy = y - lastY;
+      if (Math.abs(dy) < 6) return;
+      const shouldHide = dy > 0 && y > 40;
+      if (shouldHide !== hidden) {
+        hidden = shouldHide;
+        el.classList.toggle('fab--hidden', hidden);
+      }
+      lastY = y;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return { el };
+  }
+
+  // Sheet поиска преподавателя. Список грузится при первом открытии и кэшируется
+  // в модульной переменной teachersCache на сессию. Фильтр — после 2+ символов,
+  // нечувствительный к регистру, по подстроке.
+  async function openTeacherSearch() {
+    const content = h('<div class="teacher-search"></div>');
+    content.appendChild(h('<div class="sheet__title">Поиск преподавателя</div>'));
+    const inputWrap = h(`
+      <div class="teacher-search__input">
+        <input type="search" placeholder="Имя или фамилия" autocomplete="off" />
+      </div>
+    `);
+    const input = inputWrap.querySelector('input');
+    content.appendChild(inputWrap);
+    const status = h('<div class="teacher-search__status caption">Загружаю список…</div>');
+    content.appendChild(status);
+    const list = h('<div class="teacher-search__list"></div>');
+    content.appendChild(list);
+
+    const closeSheet = openSheet(content, router);
+
+    let teachers = teachersCache;
+    if (!teachers) {
+      try {
+        teachers = await fetchTeachers();
+        teachersCache = teachers;
+      } catch (_) {
+        status.textContent = 'Не удалось загрузить список. Попробуй ещё раз.';
+        return;
+      }
+    }
+    status.textContent = `Введи 2+ символа (всего ${teachers.length})`;
+
+    const renderList = () => {
+      const q = input.value.trim().toLowerCase();
+      list.innerHTML = '';
+      if (q.length < 2) {
+        status.textContent = `Введи 2+ символа (всего ${teachers.length})`;
+        return;
+      }
+      const found = teachers.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 80);
+      if (!found.length) {
+        status.textContent = 'Никого не нашлось';
+        return;
+      }
+      status.textContent = `Найдено: ${found.length}${found.length === 80 ? '+ (уточни запрос)' : ''}`;
+      for (const t of found) {
+        const row = h(`<button class="option-row"><span class="option-row__label">${esc(t.name)}</span></button>`);
+        row.addEventListener('click', () => {
+          hapticSelection();
+          closeSheet();
+          router.navigate('schedule', { teacher: t });
+        });
+        list.appendChild(row);
+      }
+    };
+
+    input.addEventListener('input', renderList);
+    setTimeout(() => input.focus(), 50);
+  }
 }
+
+// Сессионный кэш списка преподавателей (1600 шт., грузим один раз).
+let teachersCache = null;
 
 // Строка-тумблер для настроек. onChange(boolean).
 function toggleRow(label, on, onChange) {

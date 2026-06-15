@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=16';
+} from './constants.js?v=17';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -39,52 +39,72 @@ export function lessonTypeInfo(type) {
 }
 
 // Строка «препод · ауд. N» (room/teacher могут быть пустыми после чистки '-').
-function metaLine(lesson) {
+// В режиме просмотра расписания преподавателя — вместо ФИО показываем группу
+// и курс (полезная инфа: «кому он читает» вместо самого себя).
+function metaLine(lesson, viewMode = 'group') {
+  if (viewMode === 'teacher') {
+    const audience = teacherAudience(lesson);
+    return [audience, lesson.room ? `ауд. ${lesson.room}` : '']
+      .filter(Boolean).join(' · ');
+  }
   return [lesson.teacher, lesson.room ? `ауд. ${lesson.room}` : '']
     .filter(Boolean).join(' · ');
+}
+
+// «Кому читает» в расписании преподавателя: курс + поток/группа.
+// Поле flow упстрим отдаёт как «1-Б-О ИАИ-ИФ-И-ИК» (код потока), group обычно '-'.
+function teacherAudience(lesson) {
+  const parts = [];
+  if (lesson.course) parts.push(`${lesson.course} курс`);
+  if (lesson.flow) parts.push(lesson.flow);
+  else if (lesson.group) parts.push(lesson.group);
+  return parts.join(' · ');
 }
 
 // =========================================================
 // renderLesson(lesson, layout) — одна пара под выбранный вид
 // =========================================================
-export function renderLesson(lesson, layout) {
-  if (layout === 'compact') return renderCompact(lesson);
-  if (layout === 'ribbon') return renderRibbon(lesson);
-  return renderBlock(lesson);
+export function renderLesson(lesson, layout, viewMode = 'group') {
+  if (layout === 'compact') return renderCompact(lesson, viewMode);
+  if (layout === 'ribbon') return renderRibbon(lesson, viewMode);
+  return renderBlock(lesson, viewMode);
 }
 
 // Блочный (дефолт): карточка с цветной левой полосой и бейджем типа.
-function renderBlock(lesson) {
+function renderBlock(lesson, viewMode) {
   const { label, kind } = lessonTypeInfo(lesson.lessontype);
+  const meta = metaLine(lesson, viewMode);
   const card = h(`
     <button class="lesson lesson--block kind-${kind}">
       <div class="lesson__time">${lesson.pair ? `${lesson.pair}-я пара · ` : ''}${esc(lesson.start)} — ${esc(lesson.end)}</div>
       <div class="lesson__title">${esc(lesson.subject)}</div>
       <div class="lesson__badge-row"><span class="badge badge--${kind}">${esc(label)}</span></div>
-      ${metaLine(lesson) ? `<div class="lesson__meta">${esc(metaLine(lesson))}</div>` : ''}
+      ${meta ? `<div class="lesson__meta">${esc(meta)}</div>` : ''}
     </button>
   `);
   return card;
 }
 
-// Компактный: точка(тип) + время + название + аудитория.
-function renderCompact(lesson) {
+// Компактный: точка(тип) + время + название + аудитория (или группа в teacher-view).
+function renderCompact(lesson, viewMode) {
   const { kind } = lessonTypeInfo(lesson.lessontype);
+  const right = viewMode === 'teacher' ? teacherAudience(lesson) : lesson.room;
   const row = h(`
     <button class="lesson lesson--compact kind-${kind}">
       <span class="dot dot--${kind}"></span>
       <span class="lesson__c-time">${esc(lesson.start)}</span>
       <span class="lesson__c-title">${esc(lesson.subject)}</span>
-      <span class="lesson__c-room">${esc(lesson.room)}</span>
+      <span class="lesson__c-room">${esc(right || '')}</span>
     </button>
   `);
   return row;
 }
 
 // Ленточный: время на оси слева + карточка с цветной полосой.
-function renderRibbon(lesson) {
+function renderRibbon(lesson, viewMode) {
   const { label, kind } = lessonTypeInfo(lesson.lessontype);
-  const meta = [label.toLowerCase(), lesson.teacher, lesson.room].filter(Boolean).join(' · ');
+  const audienceOrTeacher = viewMode === 'teacher' ? teacherAudience(lesson) : lesson.teacher;
+  const meta = [label.toLowerCase(), audienceOrTeacher, lesson.room].filter(Boolean).join(' · ');
   const row = h(`
     <div class="lesson lesson--ribbon kind-${kind}">
       <div class="ribbon__axis">
@@ -268,19 +288,24 @@ function humanDate(dateKey, start) {
 
 // Контент bottom sheet'а деталей пары (без обёртки sheet).
 // stats (опц.) — сводка «по предмету», см. screens.subjectStats().
-export function lessonDetail(lesson, stats) {
+export function lessonDetail(lesson, stats, viewMode = 'group') {
   const { label, kind } = lessonTypeInfo(lesson.lessontype);
   const rows = [];
   const dur = '90 мин';
   rows.push(['Время', `${lesson.start} — ${lesson.end} (${dur})`]);
   if (lesson.room) rows.push(['Аудитория', lesson.room]);
-  if (lesson.teacher) rows.push(['Преподаватель', lesson.teacher]);
+  // В режиме преподавателя строку «Преподаватель» убираем (это и так он сам),
+  // а «Группа» делаем первичной — показываем курс + поток + группа + подгруппа.
+  if (viewMode !== 'teacher' && lesson.teacher) {
+    rows.push(['Преподаватель', lesson.teacher]);
+  }
   const groupBits = [
+    viewMode === 'teacher' && lesson.course ? `${lesson.course} курс` : '',
     lesson.flow && `поток ${lesson.flow}`,
     lesson.group && `группа ${lesson.group}`,
     lesson.subgroup && `подгруппа ${lesson.subgroup}`,
   ].filter(Boolean).join(', ');
-  if (groupBits) rows.push(['Группа', groupBits]);
+  if (groupBits) rows.push([viewMode === 'teacher' ? 'Для кого' : 'Группа', groupBits]);
 
   const wrap = h(`
     <div class="detail">

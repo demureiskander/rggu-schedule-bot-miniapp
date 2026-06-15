@@ -1,9 +1,9 @@
 // Точка входа: инициализация SDK/темы/persistence + стек-роутер экранов.
 
-import { initWebApp, onBackButton, setBackVisible } from './telegram.js?v=16';
-import { loadState, get } from './store.js?v=16';
-import { applyTheme, resolveInitialTheme } from './theme.js?v=16';
-import * as screens from './screens.js?v=16';
+import { initWebApp, onBackButton, setBackVisible } from './telegram.js?v=17';
+import { loadState, get } from './store.js?v=17';
+import { applyTheme, resolveInitialTheme } from './theme.js?v=17';
+import * as screens from './screens.js?v=17';
 
 const appEl = document.getElementById('app');
 

@@ -81,6 +81,27 @@ async function getSchedule(flow, form, course) {
   return { item: data?.item ?? '', tblData: Array.isArray(data?.tblData) ? data.tblData : [] };
 }
 
+// Расписание преподавателя. Только menuMode=teacher + teacher=<id> + intervalMode=4
+// (eduform/course/flow упустить — иначе 500).
+async function getTeacherSchedule(teacher) {
+  const fd = new FormData();
+  fd.append('menuMode', 'teacher');
+  fd.append('teacher', teacher);
+  fd.append('intervalMode', '4');
+  const data = await callUpstream('Get_Schedule_Table', fd);
+  return { item: data?.item ?? '', tblData: Array.isArray(data?.tblData) ? data.tblData : [] };
+}
+
+// Список преподавателей. Upstream Get_Teachers_List отдаёт [{data,id}],
+// нормализуем в [{id,name}] — единый shape с /api/flows.
+async function getTeachers() {
+  const data = await callUpstream('Get_Teachers_List', new FormData());
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((t) => ({ id: String(t.id ?? ''), name: t.data ?? '' }))
+    .filter((t) => t.id && t.name);
+}
+
 // --- Погода: open-meteo, без ключа, кэш на сутки ---
 const WEATHER_TTL_MS = 24 * 60 * 60 * 1000;
 let weatherCache = null; // { data, fetchedAt }
@@ -155,6 +176,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (path === '/api/schedule') {
+      const mode = q.get('mode');
+      if (mode === 'teacher') {
+        const teacher = q.get('teacher');
+        if (!teacher) return sendJSON(res, 400, { error: 'teacher required' });
+        return sendJSON(res, 200, await getTeacherSchedule(teacher));
+      }
       const flow = q.get('flow');
       const form = q.get('form');
       const course = q.get('course');
@@ -162,6 +189,10 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 400, { error: 'flow, form and course required' });
       }
       return sendJSON(res, 200, await getSchedule(flow, form, course));
+    }
+
+    if (path === '/api/teachers') {
+      return sendJSON(res, 200, await getTeachers());
     }
 
     if (path === '/api/weather') {
