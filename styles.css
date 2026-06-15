@@ -550,6 +550,8 @@ h2 { font-size: 20px; }
 .detail__dot--amber { background: var(--amber); }
 .detail__k { font-size: 11px; color: var(--text-dim); }
 .detail__v { font-size: 14px; font-weight: 500; margin-top: 2px; }
+.detail__breakdown { margin: 4px 0 0; padding-left: 18px; font-size: 13px; font-weight: 400; color: var(--text-muted); }
+.detail__breakdown li { margin-top: 2px; }
 .detail__section { margin-top: var(--sp-4); }
 .detail__section-title {
   font-size: 10px; font-weight: 600;

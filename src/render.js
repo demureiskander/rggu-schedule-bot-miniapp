@@ -244,13 +244,13 @@ export function lessonDetail(lesson, stats) {
     if (stats.next) lines.push(['Следующая пара', humanDate(stats.next.dateKey, stats.next.start)]);
     if (stats.remaining > 0) {
       const np = (n, forms) => `${n} ${plural(n, forms)}`;
-      const lec = stats.lectures > 0 ? np(stats.lectures, ['лекция', 'лекции', 'лекций']) : 'лекций нет';
-      const sem = stats.seminars > 0 ? np(stats.seminars, ['семинар', 'семинара', 'семинаров']) : 'семинаров нет';
-      let breakdown = `${lec}, ${sem}`;
-      if (stats.combo > 0) {
-        breakdown += `, ${np(stats.combo, ['лекция-семинар', 'лекции-семинара', 'лекций-семинаров'])}`;
-      }
-      lines.push(['Осталось до конца семестра', `${np(stats.remaining, ['пара', 'пары', 'пар'])}: ${breakdown}`]);
+      const items = [
+        ['лекций', stats.lectures],
+        ['семинаров', stats.seminars],
+      ];
+      if (stats.combo > 0) items.push(['лек/семов', stats.combo]);
+      const breakdown = `<ul class="detail__breakdown">${items.map(([name, n]) => `<li>${esc(name)} — ${n > 0 ? n : 'нет'}</li>`).join('')}</ul>`;
+      lines.push(['Осталось до конца семестра', `${np(stats.remaining, ['пара', 'пары', 'пар'])}:`, breakdown]);
       if (stats.other > 0) {
         lines.push(['Спецкурсы и прочее', np(stats.other, ['пара', 'пары', 'пар'])]);
       }
@@ -265,11 +265,11 @@ export function lessonDetail(lesson, stats) {
         </div>
       `);
       const secRows = sec.querySelector('.detail__rows');
-      for (const [k, v] of lines) {
+      for (const [k, v, extra] of lines) {
         secRows.appendChild(h(`
           <div class="detail__row">
             <span class="detail__dot detail__dot--amber"></span>
-            <div><div class="detail__k">${esc(k)}</div><div class="detail__v">${esc(v)}</div></div>
+            <div><div class="detail__k">${esc(k)}</div><div class="detail__v">${esc(v)}</div>${extra || ''}</div>
           </div>
         `));
       }
