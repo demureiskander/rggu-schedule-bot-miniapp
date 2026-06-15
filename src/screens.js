@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=37';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=37';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=37';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=37';
-import { applyTheme } from './theme.js?v=37';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=37';
+} from './api.js?v=38';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=38';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=38';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=38';
+import { applyTheme } from './theme.js?v=38';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=38';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=37';
+} from './render.js?v=38';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -917,6 +917,12 @@ export function renderSchedule(mount, params, router) {
     about.appendChild(linkRow('📱', '@RsuhSpaceBot', 'наш бот', () => openTelegramLink('https://t.me/RsuhSpaceBot')));
     about.appendChild(linkRow('✉️', '@textquestion', 'связаться в Telegram', () => openTelegramLink('https://t.me/textquestion')));
     content.appendChild(about);
+
+    // О разработчике.
+    content.appendChild(h('<div class="settings__label">О разработчике</div>'));
+    const dev = h('<div class="settings__list"></div>');
+    dev.appendChild(linkRow('👨‍🎓', 'Искендер Аннамухаммедов', 'студент РГГУ · ФМиР', () => openTelegramLink('https://t.me/textquestion')));
+    content.appendChild(dev);
 
     content.appendChild(h(`<div class="settings__version">Версия ${esc(APP_VERSION)} · ${esc(BOT_USERNAME)}</div>`));
 
