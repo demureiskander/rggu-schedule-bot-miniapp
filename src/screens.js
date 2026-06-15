@@ -1,12 +1,12 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=4';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=4';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=4';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=4';
-import { applyTheme } from './theme.js?v=4';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=4';
-import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=4';
+import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=5';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=5';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=5';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=5';
+import { applyTheme } from './theme.js?v=5';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=5';
+import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=5';
 
 const LAYOUT_LABELS = { block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный' };
 
@@ -550,7 +550,7 @@ export function renderSchedule(mount, params, router) {
       const [hh, mm] = (start || '00:00').split(':').map(Number);
       return ts + (hh * 60 + mm) * 60000;
     };
-    let remaining = 0, lectures = 0, seminars = 0, other = 0;
+    let remaining = 0, lectures = 0, seminars = 0, combo = 0, other = 0;
     let next = null, exam = null;
     for (const dateKey of schedule.dates) {
       const ts = dateKeyToTs(dateKey);
@@ -564,8 +564,11 @@ export function renderSchedule(mount, params, router) {
         }
         if (ts >= today.getTime()) {
           remaining++;
-          if (type === 'лек') lectures++;
-          else if (type === 'сем') seminars++;
+          const isLec = type.includes('лек');
+          const isSem = type.includes('сем');
+          if (isLec && isSem) combo++;
+          else if (isLec) lectures++;
+          else if (isSem) seminars++;
           else other++;
           if (!next && atDateTime(dateKey, l.start) > now.getTime()) {
             next = { dateKey, start: l.start };
@@ -573,7 +576,7 @@ export function renderSchedule(mount, params, router) {
         }
       }
     }
-    return { remaining, lectures, seminars, other, next, exam };
+    return { remaining, lectures, seminars, combo, other, next, exam };
   }
 
   // --- Sheet: детали пары (6.7) ---

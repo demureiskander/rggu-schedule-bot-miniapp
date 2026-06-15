@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=4';
+} from './constants.js?v=5';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -243,7 +243,11 @@ export function lessonDetail(lesson, stats) {
       const np = (n, forms) => `${n} ${plural(n, forms)}`;
       const lec = stats.lectures > 0 ? np(stats.lectures, ['лекция', 'лекции', 'лекций']) : 'лекций нет';
       const sem = stats.seminars > 0 ? np(stats.seminars, ['семинар', 'семинара', 'семинаров']) : 'семинаров нет';
-      lines.push(['Осталось до конца семестра', `${np(stats.remaining, ['пара', 'пары', 'пар'])}: ${lec}, ${sem}`]);
+      let breakdown = `${lec}, ${sem}`;
+      if (stats.combo > 0) {
+        breakdown += `, ${np(stats.combo, ['лекция-семинар', 'лекции-семинара', 'лекций-семинаров'])}`;
+      }
+      lines.push(['Осталось до конца семестра', `${np(stats.remaining, ['пара', 'пары', 'пар'])}: ${breakdown}`]);
       if (stats.other > 0) {
         lines.push(['Спецкурсы и прочее', np(stats.other, ['пара', 'пары', 'пар'])]);
       }
