@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=34';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=34';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=34';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=34';
-import { applyTheme } from './theme.js?v=34';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=34';
+} from './api.js?v=35';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=35';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=35';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=35';
+import { applyTheme } from './theme.js?v=35';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=35';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=34';
+} from './render.js?v=35';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -395,26 +395,34 @@ export function renderSchedule(mount, params, router) {
   load();
 
   async function load() {
+    console.log('[load] start', { isTeacher, params });
     screen.innerHTML = '';
     fab.el.classList.add('fab--gone');
     screen.appendChild(mascotBlock({ pose: 'think', title: 'Загружаю расписание…', spinner: true }));
     try {
       let data;
       if (isTeacher) {
+        console.log('[load] before fetch teacher', teacher?.id);
         data = await fetchTeacherSchedule(teacher.id);
       } else {
+        console.log('[load] before cache lookup', group?.id);
         data = getFreshSchedule(group.id);
+        console.log('[load] cache result', { valid: isValidSchedule(data), hasData: !!data });
         if (!isValidSchedule(data)) {
+          console.log('[load] before fetch group', { id: group.id, form: group.form, year: group.year });
           data = await fetchSchedule(group.id, group.form, group.year);
           setScheduleFor(group.id, data);
         }
       }
+      console.log('[load] data', !!data, Object.keys(data || {}));
       schedule = data;
       selected = pickInitialDate(data);
       ensureWeather();
+      console.log('[load] before draw', { selected, datesCount: data?.dates?.length });
       draw();
+      console.log('[load] draw ok');
     } catch (e) {
-      console.error('[schedule load failed]', e);
+      console.error('[load] CAUGHT', e?.message, e?.stack);
       renderError();
     }
   }
@@ -525,6 +533,9 @@ export function renderSchedule(mount, params, router) {
   }
 
   function draw() {
+    const layout0 = get.layout();
+    const isWeek0 = get.displayMode() === 'week';
+    console.log('[draw] start', { selected, layout: layout0, isWeek: isWeek0 });
     screen.innerHTML = '';
     // Расписание готово — открываем FAB (если был скрыт скроллом — тоже сбрасываем).
     fab.el.classList.remove('fab--gone', 'fab--hidden');
