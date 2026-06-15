@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=9';
+} from './constants.js?v=10';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -104,15 +104,16 @@ function renderRibbon(lesson) {
 // Шапка: полоска недели, навигация по дню, счётчик, погода
 // =========================================================
 
-// Горизонтально прокручиваемая полоска всех дней загруженного диапазона
-// (обычно весь семестр). onSelect(Date). days — массив Date (весь schedule.dates).
-// opts: { hasLessons(d), dimEmpty, scrollBehavior }
+// Горизонтально прокручиваемая полоска всех дней загруженного диапазона.
+// onSelect(Date). days — массив Date.
+// opts: { hasLessons(d), dimEmpty }
 //  - сегодня → акцентный жёлтый;
-//  - выбранный → фиолетовый кружок, полоска центрируется на нём
-//    (scrollBehavior: 'auto' при первой отрисовке, 'smooth' при навигации);
+//  - выбранный → фиолетовый кружок, лента сразу центрируется на нём
+//    (без анимации: draw() пересоздаёт DOM при каждой смене дня, анимация
+//    «от scrollLeft=0 до выбранного» выглядит как длинный скролл от начала);
 //  - пустой день (без пар) + dimEmpty → приглушаем.
 export function weekStrip(days, selectedDate, onSelect, opts = {}) {
-  const { hasLessons = () => true, dimEmpty = true, scrollBehavior = 'auto' } = opts;
+  const { hasLessons = () => true, dimEmpty = true } = opts;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   const strip = h('<div class="week-strip"></div>');
@@ -138,9 +139,12 @@ export function weekStrip(days, selectedDate, onSelect, opts = {}) {
     strip.appendChild(cell);
   }
 
+  // Центрируем мгновенно через scrollLeft (а не scrollIntoView — он может
+  // запускать smooth-анимацию, и пользователь видит «прокрутку от начала»).
   if (selectedCell) {
     requestAnimationFrame(() => {
-      selectedCell.scrollIntoView({ behavior: scrollBehavior, inline: 'center', block: 'nearest' });
+      const target = selectedCell.offsetLeft - (strip.clientWidth - selectedCell.offsetWidth) / 2;
+      strip.scrollLeft = Math.max(0, target);
     });
   }
   return strip;

@@ -1,12 +1,12 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=9';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=9';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=9';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=9';
-import { applyTheme } from './theme.js?v=9';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=9';
-import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=9';
+import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=10';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=10';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=10';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=10';
+import { applyTheme } from './theme.js?v=10';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=10';
+import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=10';
 
 const LAYOUT_LABELS = { block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный' };
 
@@ -448,8 +448,6 @@ export function renderSchedule(mount, params, router) {
     draw();
   }
 
-  let firstDraw = true;
-
   function draw() {
     screen.innerHTML = '';
 
@@ -494,9 +492,7 @@ export function renderSchedule(mount, params, router) {
     }
     screen.appendChild(weekStrip(days, selected, selectDate, {
       hasLessons, dimEmpty: get.highlightEmptyDays(),
-      scrollBehavior: firstDraw ? 'auto' : 'smooth',
     }));
-    firstDraw = false;
     screen.appendChild(dayNav(selected, () => changeDay(-1), () => changeDay(1)));
 
     const lessons = schedule.byDate[tsToDateKey(selected)] || [];
