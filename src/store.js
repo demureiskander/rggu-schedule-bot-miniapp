@@ -2,7 +2,7 @@
 // Persistence: Telegram CloudStorage (синхронизируется между устройствами) с
 // fallback на localStorage. В памяти держим текущее состояние и кэш расписания.
 
-import { cloudGet, cloudSet, hasCloudStorage } from './telegram.js?v=11';
+import { cloudGet, cloudSet, hasCloudStorage } from './telegram.js?v=12';
 
 const LS_PREFIX = 'rsuhspace:';
 
@@ -15,7 +15,7 @@ const persistedKeys = new Set();
 // Состояние в памяти.
 const state = {
   group: null,            // { form, year, id, name, details }
-  layout: 'block',        // 'block' | 'compact' | 'ribbon'
+  layout: 'block',        // 'block' | 'compact' | 'ribbon' | 'weekly'
   theme: 'dark',          // 'dark' | 'light'
   weatherEnabled: false,  // boolean
   highlightEmptyDays: true, // boolean — серое выделение дней без пар

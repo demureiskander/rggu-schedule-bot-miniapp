@@ -382,6 +382,12 @@ h2 { font-size: 20px; }
   font-weight: 700;
 }
 .day-cell--today .day-cell__dow { color: var(--amber); font-weight: 600; }
+/* Недельный вид: подсветка всех 7 дней текущей недели в полоске
+   (исключая сегодня — пусть остаётся акцентно-жёлтым). */
+.day-cell--in-range:not(.day-cell--today):not(.day-cell--sel) .day-cell__num {
+  background: var(--selected);
+  color: var(--selected-text);
+}
 
 /* Навигация дня */
 .day-nav {
@@ -511,6 +517,24 @@ h2 { font-size: 20px; }
 .ribbon__card.kind-other { border-left-color: var(--text-dim); }
 .ribbon__card.kind-lecture-seminar { border-left-color: var(--seminar); border-image: linear-gradient(var(--amber), var(--seminar)) 1; }
 .ribbon__title { font-size: 14px; margin-top: 0; }
+
+/* --- Недельный вид: 7 дней друг под другом, листание неделями --- */
+.week-days { display: flex; flex-direction: column; gap: var(--sp-5); }
+.week-day { display: flex; flex-direction: column; gap: var(--sp-2); }
+.week-day__head {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  padding: var(--sp-1) 0;
+  border-bottom: 1px solid var(--border);
+}
+.week-day__head--today { color: var(--amber); border-bottom-color: var(--amber); }
+.week-day__empty {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-style: italic;
+  padding: var(--sp-2) 0 var(--sp-3);
+}
 
 /* ============================================================
    Bottom sheet (детали пары / настройки)

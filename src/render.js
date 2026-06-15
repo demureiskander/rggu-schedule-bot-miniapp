@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=11';
+} from './constants.js?v=12';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -113,7 +113,7 @@ function renderRibbon(lesson) {
 //    «от scrollLeft=0 до выбранного» выглядит как длинный скролл от начала);
 //  - пустой день (без пар) + dimEmpty → приглушаем.
 export function weekStrip(days, selectedDate, onSelect, opts = {}) {
-  const { hasLessons = () => true, dimEmpty = true } = opts;
+  const { hasLessons = () => true, dimEmpty = true, inRange = null } = opts;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   const strip = h('<div class="week-strip"></div>');
@@ -122,10 +122,12 @@ export function weekStrip(days, selectedDate, onSelect, opts = {}) {
     const isSel = d.toDateString() === selectedDate.toDateString();
     const isToday = d.toDateString() === today.toDateString();
     const empty = dimEmpty && !hasLessons(d);
+    const inWeek = inRange ? inRange(d) : false;
     const cls = [
       'day-cell',
       isToday ? 'day-cell--today' : '',
       isSel ? 'day-cell--sel' : '',
+      inWeek && !isSel ? 'day-cell--in-range' : '',
       empty ? 'day-cell--empty' : '',
     ].filter(Boolean).join(' ');
     const cell = h(`
@@ -148,6 +150,43 @@ export function weekStrip(days, selectedDate, onSelect, opts = {}) {
     });
   }
   return strip;
+}
+
+// Понедельник недели, в которую попадает date.
+export function weekMonday(date) {
+  const m = new Date(date);
+  m.setHours(0, 0, 0, 0);
+  const dow = (m.getDay() + 6) % 7; // 0 = Пн
+  m.setDate(m.getDate() - dow);
+  return m;
+}
+
+// Заголовок недели: ‹ «16–22 июня» ›. Месяц склеивается, если разные.
+export function weekNav(monday, onPrev, onNext) {
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  const sameMonth = monday.getMonth() === sunday.getMonth();
+  const title = sameMonth
+    ? `${monday.getDate()}–${sunday.getDate()} ${MONTHS_GENITIVE[monday.getMonth()]}`
+    : `${monday.getDate()} ${MONTHS_GENITIVE[monday.getMonth()]} – ${sunday.getDate()} ${MONTHS_GENITIVE[sunday.getMonth()]}`;
+  const nav = h(`
+    <div class="day-nav">
+      <button class="day-nav__arrow" aria-label="Предыдущая неделя">‹</button>
+      <span class="day-nav__title">${esc(title)}</span>
+      <button class="day-nav__arrow" aria-label="Следующая неделя">›</button>
+    </div>
+  `);
+  const [prev, , next] = nav.children;
+  prev.addEventListener('click', onPrev);
+  next.addEventListener('click', onNext);
+  return nav;
+}
+
+// Заголовок дня в недельном виде: «Понедельник, 16 июня».
+export function weekDayHeader(date, isToday) {
+  const title = `${WEEKDAYS_FULL[date.getDay()]}, ${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()]}`;
+  const cls = isToday ? 'week-day__head week-day__head--today' : 'week-day__head';
+  return h(`<div class="${cls}">${esc(title)}</div>`);
 }
 
 // Заголовок дня: ‹ «Среда, 16 июня» ›. onPrev/onNext листают день.
