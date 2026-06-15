@@ -125,7 +125,8 @@ h2 { font-size: 20px; }
   cursor: pointer;
   transition: transform 0.08s ease, opacity 0.15s ease, background 0.15s ease;
 }
-.btn:active { transform: scale(0.97); }
+.btn:hover { filter: brightness(1.08); }
+.btn:active { transform: scale(0.97); filter: brightness(0.92); }
 .btn--amber { background: var(--amber); color: #1A1530; }
 .btn--ghost {
   background: transparent;
@@ -138,13 +139,13 @@ h2 { font-size: 20px; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border: none;
   border-radius: 50%;
   background: transparent;
   color: var(--text);
-  font-size: 20px;
+  font-size: 22px;
   cursor: pointer;
 }
 .icon-btn:active { background: var(--surface-2); }
@@ -212,7 +213,8 @@ h2 { font-size: 20px; }
   cursor: pointer;
   flex-shrink: 0;
 }
-.picker-back:active { background: var(--surface-2); }
+.picker-back:hover { background: var(--surface-2); }
+.picker-back:active { background: var(--surface-2); filter: brightness(0.92); transform: scale(0.97); }
 
 .picker-group-title {
   font-size: 11px;
@@ -246,7 +248,8 @@ h2 { font-size: 20px; }
   cursor: pointer;
   transition: transform 0.08s ease, background 0.15s ease;
 }
-.option-row:active { transform: scale(0.99); background: var(--surface-2); }
+.option-row:hover { background: var(--surface-2); }
+.option-row:active { transform: scale(0.97); background: var(--surface-2); filter: brightness(0.95); }
 .option-row__label { font-size: 16px; font-weight: 600; }
 .option-row__sub { font-size: 12px; color: var(--text-muted); }
 
@@ -313,14 +316,14 @@ h2 { font-size: 20px; }
 .icon-btn { color: var(--text-dim); }
 .sched-top__right { display: flex; align-items: center; gap: var(--sp-2); }
 .today-btn {
-  min-height: 32px;
-  padding: 0 var(--sp-3);
+  min-height: 36px;
+  padding: 0 var(--sp-4);
   border: 1px solid var(--amber);
   border-radius: var(--r-btn);
   background: transparent;
   color: var(--amber);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -333,29 +336,35 @@ h2 { font-size: 20px; }
 /* Полоска недели */
 .week-strip {
   display: flex;
-  gap: 2px;
+  gap: 4px;
   margin-bottom: var(--sp-2);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.week-strip::-webkit-scrollbar { display: none; }
 .day-cell {
-  flex: 1;
+  flex: 1 0 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 4px 0;
+  gap: 4px;
+  padding: 6px 0;
   border: none;
   background: transparent;
   color: var(--text-dim);
   font-family: inherit;
   cursor: pointer;
+  scroll-snap-align: center;
 }
 .day-cell__num {
-  width: 32px; height: 32px;
+  width: 40px; height: 40px;
   display: flex; align-items: center; justify-content: center;
   border-radius: 50%;
-  font-size: 13px; font-weight: 600;
+  font-size: 15px; font-weight: 600;
 }
-.day-cell__dow { font-size: 10px; font-weight: 500; }
+.day-cell__dow { font-size: 11px; font-weight: 500; }
 .day-cell--sel .day-cell__num {
   background: var(--selected);
   color: var(--selected-text);

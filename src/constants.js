@@ -108,7 +108,37 @@ export const INSTITUTES = {
   ОИСвГС: 'Отделение интеллектуальных систем в гуманитарной сфере',
   ИЖиМ:   'Институт журналистики и медиаиндустрий',
   ИЕиВИ:  'Институт евразийских и восточных исследований',
+  УН:     'Учебно-научный институт антропологии и этнологии',
 };
+
+// Эмодзи институтов по аббревиатуре (для списка выбора). Нерасшифрованные — 🏛.
+const INSTITUTE_EMOJI = {
+  ИАИ:    '📜',
+  ИФИ:    '📖',
+  ИЛ:     '🗣',
+  ИП:     '🧠',
+  ИПр:    '⚖️',
+  ИЭУП:   '📊',
+  ИСЭН:   '💼',
+  ИЖиМ:   '📰',
+  ИМОиПН: '🌍',
+  ИВКА:   '🏯',
+  ИИНиТБ: '💻',
+  ФИИ:    '🎨',
+  ФК:     '🎭',
+  ФФ:     '💡',
+  СФ:     '👥',
+  ФРиСО:  '📢',
+  ФРИСО:  '📢',
+  ИИРиДК: '🕊',
+  ОИСвГС: '🤖',
+  ИЕиВИ:  '🗺',
+  УН:     '🧬',
+};
+
+export function instituteIcon(abbr) {
+  return INSTITUTE_EMOJI[abbr] || '🏛';
+}
 
 // Аббревиатура института из кода группы (name = "ИАИ-ФАД-ДА-... (Группа: 1)").
 export function instituteAbbr(name) {
@@ -135,7 +165,7 @@ export function buildTree(flows) {
   for (const f of flows) {
     const abbr = instituteAbbr(f.name);
     const { name, resolved } = instituteName(abbr);
-    if (!byInst.has(name)) byInst.set(name, { name, resolved, abbrs: new Set(), dirs: new Map() });
+    if (!byInst.has(name)) byInst.set(name, { name, resolved, icon: instituteIcon(abbr), abbrs: new Set(), dirs: new Map() });
     const inst = byInst.get(name);
     inst.abbrs.add(abbr);
     const { direction } = splitDetails(f.details);

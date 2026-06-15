@@ -1,12 +1,12 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=5';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=5';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=5';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=5';
-import { applyTheme } from './theme.js?v=5';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=5';
-import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=5';
+import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=6';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=6';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=6';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=6';
+import { applyTheme } from './theme.js?v=6';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=6';
+import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=6';
 
 const LAYOUT_LABELS = { block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный' };
 
@@ -258,7 +258,7 @@ function renderPickerInstitute(mount, params, router) {
       for (const inst of buildTree(flows)) {
         const count = [...inst.dirs.values()].reduce((s, a) => s + a.length, 0);
         // Расшифрованным дописываем аббревиатуру в скобках; фолбэк — без дубля.
-        const title = inst.resolved ? `${inst.name} (${[...inst.abbrs].join('/')})` : inst.name;
+        const title = inst.resolved ? `${inst.icon} ${inst.name} (${[...inst.abbrs].join('/')})` : `${inst.icon} ${inst.name}`;
         const item = h(`
           <button class="option-row">
             <span class="option-row__label">${esc(title)}</span>
@@ -453,12 +453,15 @@ export function renderSchedule(mount, params, router) {
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const isToday = selected.toDateString() === today.toDateString();
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const isTomorrow = selected.toDateString() === tomorrow.toDateString();
     const { min, max } = rangeBounds();
     const todayInRange = today.getTime() >= min && today.getTime() <= max;
 
-    // Шапка: погода (если включена) слева; справа — «Сегодня» (если не на сегодня) + шестерёнка.
+    // Шапка: погода (если включена, и только для сегодня/завтра) слева;
+    // справа — «Сегодня» (если не на сегодня) + шестерёнка.
     const top = h('<div class="sched-top"></div>');
-    const wEl = get.weatherEnabled() ? weatherBadge(get.weather()) : null;
+    const wEl = (get.weatherEnabled() && (isToday || isTomorrow)) ? weatherBadge(get.weather()) : null;
     top.appendChild(wEl || h('<span></span>'));
     const right = h('<div class="sched-top__right"></div>');
     if (!isToday && todayInRange) {
@@ -629,7 +632,7 @@ export function renderSchedule(mount, params, router) {
     }));
 
     // Подсветка дней без пар.
-    content.appendChild(toggleRow('Подсвечивать дни без пар', get.highlightEmptyDays(), async (on) => {
+    content.appendChild(toggleRow('Затемнять дни без пар', get.highlightEmptyDays(), async (on) => {
       await set('highlightEmptyDays', on);
       draw();
     }));
