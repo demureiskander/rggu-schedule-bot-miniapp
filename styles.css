@@ -433,10 +433,11 @@ h2 { font-size: 20px; }
 }
 .day-nav__title { font-size: 15px; font-weight: 600; }
 .day-nav__arrow {
-  width: 44px; height: 44px;
+  width: 52px; height: 52px;
   border: none; background: transparent;
-  color: var(--text-dim);
-  font-size: 20px;
+  color: var(--text);
+  font-size: 32px;
+  line-height: 1;
   cursor: pointer;
 }
 .counter {
