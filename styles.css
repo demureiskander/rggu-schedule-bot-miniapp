@@ -413,6 +413,16 @@ h2 { font-size: 20px; }
   background: transparent;
   color: var(--text);
 }
+/* В недельном виде выбранный день внутри pill не получает свой кружок —
+   достаточно общей плашки (выделять «выбран» в режиме «по неделям» нечего:
+   листание всё равно идёт неделями, акцент только на «сегодня»). */
+.week-strip--weekly .day-cell--sel:not(.day-cell--today) .day-cell__num {
+  background: transparent;
+}
+.week-strip--weekly .day-cell--sel:not(.day-cell--today) .day-cell__dow {
+  color: var(--text-dim);
+  font-weight: 500;
+}
 
 /* Навигация дня */
 .day-nav {

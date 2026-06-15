@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=27';
+} from './constants.js?v=28';
 
 // --- DOM/утилиты ---
 function h(html) {
