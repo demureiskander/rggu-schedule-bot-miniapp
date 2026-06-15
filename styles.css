@@ -333,17 +333,20 @@ h2 { font-size: 20px; }
 .weather__icon { font-size: 16px; line-height: 1; }
 .weather__temp { font-size: 12px; color: var(--text-muted); font-weight: 500; }
 
-/* Полоска недели. Свайп переключает неделю целиком (см. weekStrip), поэтому
-   сама полоска не скроллится — 7 ячеек всегда занимают всю ширину. */
+/* Полоска дней — горизонтальный скролл по всему загруженному диапазону
+   (обычно весь семестр), выбранный день центрируется. */
 .week-strip {
   display: flex;
   gap: 4px;
   margin-bottom: var(--sp-2);
-  touch-action: pan-y;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.week-strip::-webkit-scrollbar { display: none; }
 .day-cell {
-  flex: 1;
-  min-width: 0;
+  flex: 0 0 44px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -354,6 +357,7 @@ h2 { font-size: 20px; }
   color: var(--text-dim);
   font-family: inherit;
   cursor: pointer;
+  scroll-snap-align: center;
 }
 .day-cell__num {
   width: 40px; height: 40px;
@@ -368,7 +372,6 @@ h2 { font-size: 20px; }
   font-weight: 700;
 }
 .day-cell--sel .day-cell__dow { color: var(--primary); font-weight: 600; }
-.day-cell--off { opacity: 0.3; cursor: default; pointer-events: none; }
 /* Пустой день (в диапазоне, без пар) — приглушаем, но кликается */
 .day-cell--empty { opacity: 0.4; }
 /* Сегодня — акцентный жёлтый (приоритет над выбранным) */

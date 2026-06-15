@@ -1,12 +1,12 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=7';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=7';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=7';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=7';
-import { applyTheme } from './theme.js?v=7';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=7';
-import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=7';
+import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=8';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=8';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=8';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=8';
+import { applyTheme } from './theme.js?v=8';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=8';
+import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=8';
 
 const LAYOUT_LABELS = { block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный' };
 
@@ -438,20 +438,6 @@ export function renderSchedule(mount, params, router) {
     draw();
   }
 
-  // Свайп полоски недели — переключение на ±7 дней; если новая дата вне
-  // загруженного диапазона, прижимаем к границе (а не игнорируем свайп).
-  function changeWeek(delta) {
-    const next = new Date(selected);
-    next.setDate(next.getDate() + delta * 7);
-    const { min, max } = rangeBounds();
-    if (next.getTime() < min) next.setTime(min);
-    if (next.getTime() > max) next.setTime(max);
-    if (next.toDateString() === selected.toDateString()) return;
-    haptic('light');
-    selected = next;
-    draw();
-  }
-
   // Прыжок на сегодняшний день (в пределах загруженного диапазона).
   function goToday() {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -461,6 +447,8 @@ export function renderSchedule(mount, params, router) {
     selected = today;
     draw();
   }
+
+  let firstDraw = true;
 
   function draw() {
     screen.innerHTML = '';
@@ -489,14 +477,16 @@ export function renderSchedule(mount, params, router) {
     top.appendChild(right);
     screen.appendChild(top);
 
-    // Полоска недели (7 дней) + навигация дня + счётчик.
-    // Вне диапазона — погашены; пустые дни (если включено) — приглушены; сегодня — жёлтый.
-    const inRange = (d) => d.getTime() >= min && d.getTime() <= max;
+    // Полоска дней — горизонтальный скролл по всему загруженному диапазону.
+    // Пустые дни (если включено) — приглушены; сегодня — жёлтый; выбранный
+    // день центрируется (плавно при навигации, мгновенно при первой отрисовке).
     const hasLessons = (d) => (schedule.byDate[tsToDateKey(d)] || []).length > 0;
-    screen.appendChild(weekStrip(selected, selectDate, {
-      isEnabled: inRange, hasLessons, dimEmpty: get.highlightEmptyDays(),
-      onWeekSwipe: changeWeek,
+    const days = schedule.dates.map((k) => new Date(dateKeyToTs(k)));
+    screen.appendChild(weekStrip(days, selected, selectDate, {
+      hasLessons, dimEmpty: get.highlightEmptyDays(),
+      scrollBehavior: firstDraw ? 'auto' : 'smooth',
     }));
+    firstDraw = false;
     screen.appendChild(dayNav(selected, () => changeDay(-1), () => changeDay(1)));
 
     const lessons = schedule.byDate[tsToDateKey(selected)] || [];

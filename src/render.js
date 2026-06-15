@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=7';
+} from './constants.js?v=8';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -104,59 +104,44 @@ function renderRibbon(lesson) {
 // Шапка: полоска недели, навигация по дню, счётчик, погода
 // =========================================================
 
-// Полоска всех 7 дней (Пн–Вс) недели выбранного дня. onSelect(Date).
-// opts: { isEnabled(d), hasLessons(d), dimEmpty }
-//  - !isEnabled → вне загруженного диапазона: гасим, без тапа;
+// Горизонтально прокручиваемая полоска всех дней загруженного диапазона
+// (обычно весь семестр). onSelect(Date). days — массив Date (весь schedule.dates).
+// opts: { hasLessons(d), dimEmpty, scrollBehavior }
 //  - сегодня → акцентный жёлтый;
-//  - выбранный → фиолетовый кружок;
-//  - пустой день (в диапазоне, без пар) + dimEmpty → приглушаем.
-export function weekStrip(selectedDate, onSelect, opts = {}) {
-  const { isEnabled = () => true, hasLessons = () => true, dimEmpty = true, onWeekSwipe } = opts;
+//  - выбранный → фиолетовый кружок, полоска центрируется на нём
+//    (scrollBehavior: 'auto' при первой отрисовке, 'smooth' при навигации);
+//  - пустой день (без пар) + dimEmpty → приглушаем.
+export function weekStrip(days, selectedDate, onSelect, opts = {}) {
+  const { hasLessons = () => true, dimEmpty = true, scrollBehavior = 'auto' } = opts;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
-  const monday = new Date(selectedDate);
-  const dow = (monday.getDay() + 6) % 7; // 0 = Пн
-  monday.setDate(monday.getDate() - dow);
-
   const strip = h('<div class="week-strip"></div>');
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
+  let selectedCell = null;
+  for (const d of days) {
     const isSel = d.toDateString() === selectedDate.toDateString();
     const isToday = d.toDateString() === today.toDateString();
-    const off = !isEnabled(d);
-    const empty = !off && dimEmpty && !hasLessons(d);
+    const empty = dimEmpty && !hasLessons(d);
     const cls = [
       'day-cell',
       isToday ? 'day-cell--today' : '',
       isSel ? 'day-cell--sel' : '',
-      off ? 'day-cell--off' : '',
       empty ? 'day-cell--empty' : '',
     ].filter(Boolean).join(' ');
     const cell = h(`
-      <button class="${cls}"${off ? ' disabled' : ''}>
+      <button class="${cls}">
         <span class="day-cell__num">${d.getDate()}</span>
         <span class="day-cell__dow">${WEEKDAYS_SHORT[d.getDay()]}</span>
       </button>
     `);
-    if (!off) cell.addEventListener('click', () => onSelect(new Date(d)));
+    cell.addEventListener('click', () => onSelect(new Date(d)));
+    if (isSel) selectedCell = cell;
     strip.appendChild(cell);
   }
 
-  // Свайп по полоске — переключение целиком на неделю вперёд/назад.
-  if (onWeekSwipe) {
-    let startX = null, startY = null;
-    strip.addEventListener('touchstart', (e) => {
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-    }, { passive: true });
-    strip.addEventListener('touchend', (e) => {
-      if (startX == null) return;
-      const dx = e.changedTouches[0].clientX - startX;
-      const dy = e.changedTouches[0].clientY - startY;
-      startX = null;
-      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) onWeekSwipe(dx < 0 ? 1 : -1);
-    }, { passive: true });
+  if (selectedCell) {
+    requestAnimationFrame(() => {
+      selectedCell.scrollIntoView({ behavior: scrollBehavior, inline: 'center', block: 'nearest' });
+    });
   }
   return strip;
 }
