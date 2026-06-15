@@ -1,12 +1,12 @@
 // Экраны приложения: welcome, picker (форма→курс→поиск), расписание + sheets.
 
-import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=10';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=10';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=10';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=10';
-import { applyTheme } from './theme.js?v=10';
-import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=10';
-import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=10';
+import { fetchFlows, fetchSchedule, fetchWeather, tsToDateKey, dateKeyToTs } from './api.js?v=11';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=11';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=11';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=11';
+import { applyTheme } from './theme.js?v=11';
+import { haptic, hapticSelection, setBackVisible } from './telegram.js?v=11';
+import { renderLesson, weekStrip, dayNav, counterText, weatherBadge, lessonDetail } from './render.js?v=11';
 
 const LAYOUT_LABELS = { block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный' };
 
@@ -553,17 +553,26 @@ export function renderSchedule(mount, params, router) {
     if (w) { setWeather(w); if (schedule) draw(); }
   }
 
-  // Сводка по предмету до конца семестра (из загруженного расписания = весь семестр).
-  // remaining/breakdown — от сегодняшней даты; next — ближайшая будущая пара;
-  // exam — занятие с lessontype 'экзамен' (если есть).
-  function subjectStats(subject) {
+  // Сводка по предмету (из загруженного расписания = весь семестр):
+  //  remaining/breakdown — от сегодняшней даты;
+  //  next — ближайшая пара ПОСЛЕ просматриваемой (важно: не «после сегодня»,
+  //    иначе при просмотре будущего экзамена «Следующая пара» оказывается
+  //    в прошлом);
+  //  isLast — просматриваемая не-экзамен пара последняя по предмету;
+  //  viewedIsExam — просматриваемая пара = экзамен;
+  //  lessonsBeforeExam — для экзамена: сколько занятий ещё впереди до него
+  //    (от сегодня).
+  function subjectStats(subject, viewed) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const now = new Date();
     const atDateTime = (dateKey, start) => {
       const ts = dateKeyToTs(dateKey);
       const [hh, mm] = (start || '00:00').split(':').map(Number);
       return ts + (hh * 60 + mm) * 60000;
     };
+    const viewedKey = tsToDateKey(selected);
+    const viewedTs = atDateTime(viewedKey, viewed.start);
+    const viewedIsExam = (viewed.lessontype || '').toLowerCase() === 'экзамен';
+
     let remaining = 0, lectures = 0, seminars = 0, combo = 0, other = 0;
     let next = null, exam = null;
     for (const dateKey of schedule.dates) {
@@ -571,11 +580,11 @@ export function renderSchedule(mount, params, router) {
       for (const l of schedule.byDate[dateKey]) {
         if (l.subject !== subject) continue;
         const type = (l.lessontype || '').toLowerCase();
-        // Экзамен — отдельной строкой, в «осталось пар» и «следующую» не считаем.
         if (type === 'экзамен') {
-          if (!exam) exam = { dateKey, start: l.start };
+          if (!exam) exam = { dateKey, start: l.start, ts: atDateTime(dateKey, l.start) };
           continue;
         }
+        const lessonTs = atDateTime(dateKey, l.start);
         if (ts >= today.getTime()) {
           remaining++;
           const isLec = type.includes('лек');
@@ -584,19 +593,38 @@ export function renderSchedule(mount, params, router) {
           else if (isLec) lectures++;
           else if (isSem) seminars++;
           else other++;
-          if (!next && atDateTime(dateKey, l.start) > now.getTime()) {
-            next = { dateKey, start: l.start };
-          }
+        }
+        if (lessonTs > viewedTs && (!next || lessonTs < next.ts)) {
+          next = { dateKey, start: l.start, ts: lessonTs };
         }
       }
     }
-    return { remaining, lectures, seminars, combo, other, next, exam };
+
+    let lessonsBeforeExam = 0;
+    if (viewedIsExam) {
+      const examTs = viewedTs;
+      for (const dateKey of schedule.dates) {
+        const ts = dateKeyToTs(dateKey);
+        if (ts < today.getTime()) continue;
+        for (const l of schedule.byDate[dateKey]) {
+          if (l.subject !== subject) continue;
+          if ((l.lessontype || '').toLowerCase() === 'экзамен') continue;
+          if (atDateTime(dateKey, l.start) < examTs) lessonsBeforeExam++;
+        }
+      }
+    }
+
+    const isLast = !viewedIsExam && !next;
+    return {
+      remaining, lectures, seminars, combo, other,
+      next, exam, isLast, viewedIsExam, lessonsBeforeExam,
+    };
   }
 
   // --- Sheet: детали пары (6.7) ---
   function openDetail(lesson) {
     haptic('light');
-    openSheet(lessonDetail(lesson, subjectStats(lesson.subject)), router);
+    openSheet(lessonDetail(lesson, subjectStats(lesson.subject, lesson)), router);
   }
 
   // --- Sheet: настройки (6.6) ---

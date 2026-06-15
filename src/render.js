@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=10';
+} from './constants.js?v=11';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -246,9 +246,22 @@ export function lessonDetail(lesson, stats) {
   // Блок «по этому предмету» (до конца семестра, из загруженного расписания).
   if (stats) {
     const lines = [];
-    if (stats.next) lines.push(['Следующая пара', humanDate(stats.next.dateKey, stats.next.start)]);
+    const np = (n, forms) => `${n} ${plural(n, forms)}`;
+    if (stats.viewedIsExam) {
+      // Просматриваем экзамен. Дата/время экзамена дублирует «Время» выше —
+      // не повторяем; вместо «следующей пары» — сколько занятий ещё впереди.
+      if (stats.lessonsBeforeExam > 0) {
+        lines.push(['До экзамена осталось',
+          np(stats.lessonsBeforeExam, ['занятие', 'занятия', 'занятий'])]);
+      }
+    } else {
+      if (stats.next) {
+        lines.push(['Следующая пара', humanDate(stats.next.dateKey, stats.next.start)]);
+      } else if (stats.isLast) {
+        lines.push(['Следующая пара', 'это последняя пара по предмету']);
+      }
+    }
     if (stats.remaining > 0) {
-      const np = (n, forms) => `${n} ${plural(n, forms)}`;
       const items = [
         ['лекций', stats.lectures],
         ['семинаров', stats.seminars],
@@ -260,7 +273,10 @@ export function lessonDetail(lesson, stats) {
         lines.push(['Спецкурсы и прочее', np(stats.other, ['пара', 'пары', 'пар'])]);
       }
     }
-    if (stats.exam) lines.push(['Экзамен', humanDate(stats.exam.dateKey, stats.exam.start)]);
+    // Дата экзамена — только если просматриваем не сам экзамен.
+    if (stats.exam && !stats.viewedIsExam) {
+      lines.push(['Экзамен', humanDate(stats.exam.dateKey, stats.exam.start)]);
+    }
 
     if (lines.length) {
       const sec = h(`
