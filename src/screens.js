@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=32';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=32';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=32';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=32';
-import { applyTheme } from './theme.js?v=32';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=32';
+} from './api.js?v=33';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=33';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=33';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=33';
+import { applyTheme } from './theme.js?v=33';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=33';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=32';
+} from './render.js?v=33';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -413,11 +413,14 @@ export function renderSchedule(mount, params, router) {
       selected = pickInitialDate(data);
       ensureWeather();
       draw();
-    } catch (_) {
+    } catch (e) {
+      console.error('[schedule load failed]', e, { isTeacher, params });
+      lastError = e;
       renderError();
     }
   }
 
+  let lastError = null;
   function renderError() {
     screen.innerHTML = '';
     fab.el.classList.add('fab--gone');
@@ -433,7 +436,7 @@ export function renderSchedule(mount, params, router) {
     screen.appendChild(mascotBlock({
       pose: 'sad',
       title: 'Что-то пошло не так',
-      subtitle: 'Не удалось загрузить расписание. Проверь подключение к интернету.',
+      subtitle: `Не удалось загрузить расписание. ${lastError ? `(${String(lastError?.message || lastError)})` : 'Проверь подключение к интернету.'}`,
       actions,
     }));
   }
