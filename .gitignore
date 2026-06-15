@@ -5,3 +5,7 @@ node_modules/
 *.log
 .vscode/
 .idea/
+
+# Внутренние заметки разработчика — не публикуем в публичном Pages-репо
+CHANGELOG.md
+CLAUDE.md
