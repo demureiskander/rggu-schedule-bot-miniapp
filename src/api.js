@@ -2,8 +2,8 @@
 // Бот уже отдаёт нормализованный JSON (см. CLAUDE.md §4); здесь мы только
 // приводим расписание к удобной для рендера форме (карта по датам + тайм-слоты).
 
-import { API_BASE } from '../config.js?v=33';
-import { TIME_SLOTS } from './constants.js?v=33';
+import { API_BASE } from '../config.js?v=34';
+import { TIME_SLOTS } from './constants.js?v=34';
 
 // Унифицированный GET. Бросает Error при сетевой ошибке/не-2xx —
 // человекочитаемые сообщения для пользователя формируются в слое экранов.

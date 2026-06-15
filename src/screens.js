@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=33';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=33';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=33';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=33';
-import { applyTheme } from './theme.js?v=33';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=33';
+} from './api.js?v=34';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=34';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=34';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=34';
+import { applyTheme } from './theme.js?v=34';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=34';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=33';
+} from './render.js?v=34';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -404,7 +404,7 @@ export function renderSchedule(mount, params, router) {
         data = await fetchTeacherSchedule(teacher.id);
       } else {
         data = getFreshSchedule(group.id);
-        if (!data) {
+        if (!isValidSchedule(data)) {
           data = await fetchSchedule(group.id, group.form, group.year);
           setScheduleFor(group.id, data);
         }
@@ -414,13 +414,18 @@ export function renderSchedule(mount, params, router) {
       ensureWeather();
       draw();
     } catch (e) {
-      console.error('[schedule load failed]', e, { isTeacher, params });
-      lastError = e;
+      console.error('[schedule load failed]', e);
       renderError();
     }
   }
 
-  let lastError = null;
+  // Считаем кэш валидным только если в нём есть и массив dates, и карта byDate.
+  // Защита от ситуации, когда в state.schedule осталось что-то «полупустое»
+  // (битый/устаревший формат) — иначе draw() упадёт на schedule.byDate/dates.
+  function isValidSchedule(d) {
+    return Boolean(d && Array.isArray(d.dates) && d.byDate && typeof d.byDate === 'object');
+  }
+
   function renderError() {
     screen.innerHTML = '';
     fab.el.classList.add('fab--gone');
@@ -436,7 +441,7 @@ export function renderSchedule(mount, params, router) {
     screen.appendChild(mascotBlock({
       pose: 'sad',
       title: 'Что-то пошло не так',
-      subtitle: `Не удалось загрузить расписание. ${lastError ? `(${String(lastError?.message || lastError)})` : 'Проверь подключение к интернету.'}`,
+      subtitle: 'Не удалось загрузить расписание. Проверь подключение к интернету.',
       actions,
     }));
   }
