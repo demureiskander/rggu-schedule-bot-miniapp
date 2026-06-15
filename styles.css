@@ -333,19 +333,17 @@ h2 { font-size: 20px; }
 .weather__icon { font-size: 16px; line-height: 1; }
 .weather__temp { font-size: 12px; color: var(--text-muted); font-weight: 500; }
 
-/* Полоска недели */
+/* Полоска недели. Свайп переключает неделю целиком (см. weekStrip), поэтому
+   сама полоска не скроллится — 7 ячеек всегда занимают всю ширину. */
 .week-strip {
   display: flex;
   gap: 4px;
   margin-bottom: var(--sp-2);
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  touch-action: pan-y;
 }
-.week-strip::-webkit-scrollbar { display: none; }
 .day-cell {
-  flex: 1 0 48px;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -356,7 +354,6 @@ h2 { font-size: 20px; }
   color: var(--text-dim);
   font-family: inherit;
   cursor: pointer;
-  scroll-snap-align: center;
 }
 .day-cell__num {
   width: 40px; height: 40px;

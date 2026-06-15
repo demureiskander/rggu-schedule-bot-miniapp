@@ -258,7 +258,7 @@ function renderPickerInstitute(mount, params, router) {
       for (const inst of buildTree(flows)) {
         const count = [...inst.dirs.values()].reduce((s, a) => s + a.length, 0);
         // Расшифрованным дописываем аббревиатуру в скобках; фолбэк — без дубля.
-        const title = inst.resolved ? `${inst.icon} ${inst.name} (${[...inst.abbrs].join('/')})` : `${inst.icon} ${inst.name}`;
+        const title = inst.resolved ? `${inst.icon} ${[...inst.abbrs].join('/')} — ${inst.name}` : `${inst.icon} ${inst.name}`;
         const item = h(`
           <button class="option-row">
             <span class="option-row__label">${esc(title)}</span>
@@ -438,6 +438,20 @@ export function renderSchedule(mount, params, router) {
     draw();
   }
 
+  // Свайп полоски недели — переключение на ±7 дней; если новая дата вне
+  // загруженного диапазона, прижимаем к границе (а не игнорируем свайп).
+  function changeWeek(delta) {
+    const next = new Date(selected);
+    next.setDate(next.getDate() + delta * 7);
+    const { min, max } = rangeBounds();
+    if (next.getTime() < min) next.setTime(min);
+    if (next.getTime() > max) next.setTime(max);
+    if (next.toDateString() === selected.toDateString()) return;
+    haptic('light');
+    selected = next;
+    draw();
+  }
+
   // Прыжок на сегодняшний день (в пределах загруженного диапазона).
   function goToday() {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -481,6 +495,7 @@ export function renderSchedule(mount, params, router) {
     const hasLessons = (d) => (schedule.byDate[tsToDateKey(d)] || []).length > 0;
     screen.appendChild(weekStrip(selected, selectDate, {
       isEnabled: inRange, hasLessons, dimEmpty: get.highlightEmptyDays(),
+      onWeekSwipe: changeWeek,
     }));
     screen.appendChild(dayNav(selected, () => changeDay(-1), () => changeDay(1)));
 

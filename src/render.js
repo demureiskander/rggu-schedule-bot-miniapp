@@ -111,7 +111,7 @@ function renderRibbon(lesson) {
 //  - выбранный → фиолетовый кружок;
 //  - пустой день (в диапазоне, без пар) + dimEmpty → приглушаем.
 export function weekStrip(selectedDate, onSelect, opts = {}) {
-  const { isEnabled = () => true, hasLessons = () => true, dimEmpty = true } = opts;
+  const { isEnabled = () => true, hasLessons = () => true, dimEmpty = true, onWeekSwipe } = opts;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   const monday = new Date(selectedDate);
@@ -141,6 +141,22 @@ export function weekStrip(selectedDate, onSelect, opts = {}) {
     `);
     if (!off) cell.addEventListener('click', () => onSelect(new Date(d)));
     strip.appendChild(cell);
+  }
+
+  // Свайп по полоске — переключение целиком на неделю вперёд/назад.
+  if (onWeekSwipe) {
+    let startX = null, startY = null;
+    strip.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+    strip.addEventListener('touchend', (e) => {
+      if (startX == null) return;
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = e.changedTouches[0].clientY - startY;
+      startX = null;
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) onWeekSwipe(dx < 0 ? 1 : -1);
+    }, { passive: true });
   }
   return strip;
 }
