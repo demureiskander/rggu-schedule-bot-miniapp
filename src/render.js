@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=29';
+} from './constants.js?v=30';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -169,14 +169,16 @@ export function weekStrip(days, selectedDate, onSelect, opts = {}) {
     }
   }
 
-  // Центрируем мгновенно: используем bounding-rect (offsetLeft был бы относителен
-  // ближайшему offsetParent — а с pill-обёрткой это уже не сам strip).
-  if (selectedCell) {
+  // Центрируем мгновенно. В недельном режиме целимся в pill целиком (selected =
+  // понедельник новой недели, центрирование по нему «выкидывало» pill вправо).
+  // В режиме «по дням» — по-прежнему выбранный день.
+  const centerTarget = (weekly && pill) ? pill : selectedCell;
+  if (centerTarget) {
     requestAnimationFrame(() => {
-      const cr = selectedCell.getBoundingClientRect();
+      const cr = centerTarget.getBoundingClientRect();
       const sr = strip.getBoundingClientRect();
-      const target = strip.scrollLeft + (cr.left - sr.left) - (strip.clientWidth - cr.width) / 2;
-      strip.scrollLeft = Math.max(0, target);
+      const left = strip.scrollLeft + (cr.left - sr.left) - (strip.clientWidth - cr.width) / 2;
+      strip.scrollLeft = Math.max(0, left);
     });
   }
   return strip;
