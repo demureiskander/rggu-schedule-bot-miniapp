@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=3';
+} from './constants.js?v=4';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -240,12 +240,13 @@ export function lessonDetail(lesson, stats) {
     const lines = [];
     if (stats.next) lines.push(['Следующая пара', humanDate(stats.next.dateKey, stats.next.start)]);
     if (stats.remaining > 0) {
-      const parts = [];
-      if (stats.lectures) parts.push(`${stats.lectures} лек.`);
-      if (stats.seminars) parts.push(`${stats.seminars} сем.`);
-      if (stats.other) parts.push(`${stats.other} др.`);
-      const breakdown = parts.length ? ` (${parts.join(' · ')})` : '';
-      lines.push(['Осталось до конца семестра', `${stats.remaining} пар${breakdown}`]);
+      const np = (n, forms) => `${n} ${plural(n, forms)}`;
+      const lec = stats.lectures > 0 ? np(stats.lectures, ['лекция', 'лекции', 'лекций']) : 'лекций нет';
+      const sem = stats.seminars > 0 ? np(stats.seminars, ['семинар', 'семинара', 'семинаров']) : 'семинаров нет';
+      lines.push(['Осталось до конца семестра', `${np(stats.remaining, ['пара', 'пары', 'пар'])}: ${lec}, ${sem}`]);
+      if (stats.other > 0) {
+        lines.push(['Спецкурсы и прочее', np(stats.other, ['пара', 'пары', 'пар'])]);
+      }
     }
     if (stats.exam) lines.push(['Экзамен', humanDate(stats.exam.dateKey, stats.exam.start)]);
 
