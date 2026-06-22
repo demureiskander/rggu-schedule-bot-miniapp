@@ -530,6 +530,11 @@ h2 { font-size: 20px; }
 .lesson__title { font-size: 16px; font-weight: 600; margin-top: 5px; }
 .lesson__badge-row { margin-top: 7px; }
 .lesson__meta { font-size: 12px; color: var(--text-dim); margin-top: 7px; }
+/* Аудитория — первое, что ищут глазами в расписании. Делаем заметной:
+   полный --text, чуть крупнее, иконка-пиктограмма слева, своя строка. */
+.lesson__room { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--text); }
+.lesson__room-icon { font-size: 13px; }
+.lesson__room-text { letter-spacing: 0.2px; }
 
 /* --- Компактный вид --- */
 .lessons--compact { display: flex; flex-direction: column; }
@@ -549,7 +554,7 @@ h2 { font-size: 20px; }
 }
 .lesson__c-time { width: 40px; font-size: 13px; font-weight: 600; color: var(--text-muted); flex-shrink: 0; }
 .lesson__c-title { flex: 1; font-size: 14px; font-weight: 500; }
-.lesson__c-room { font-size: 12px; color: var(--text-dim); }
+.lesson__c-room { font-size: 13px; font-weight: 600; color: var(--text); }
 
 /* --- Ленточный вид --- */
 .lessons--ribbon { display: flex; flex-direction: column; gap: 8px; }

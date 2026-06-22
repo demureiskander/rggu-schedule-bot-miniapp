@@ -2,8 +2,8 @@
 // Бот уже отдаёт нормализованный JSON (см. CLAUDE.md §4); здесь мы только
 // приводим расписание к удобной для рендера форме (карта по датам + тайм-слоты).
 
-import { API_BASE } from '../config.js?v=39';
-import { TIME_SLOTS } from './constants.js?v=39';
+import { API_BASE } from '../config.js?v=40';
+import { TIME_SLOTS } from './constants.js?v=40';
 
 // Унифицированный GET. Бросает Error при сетевой ошибке/не-2xx —
 // человекочитаемые сообщения для пользователя формируются в слое экранов.
@@ -86,21 +86,42 @@ function normalizeSchedule(data) {
     for (const slot of day.pairs || []) {
       const pairNum = Number(slot.pair);
       const time = TIME_SLOTS[pairNum - 1] || { start: '', end: '' };
+      // В одной паре может быть несколько flows[] — типично у преподавателя,
+      // который читает у нескольких групп одновременно (одно время, один
+      // предмет, одна аудитория). Сворачиваем такие flows в одну карточку,
+      // собирая «адресатов» (audiences) — иначе на экране дубли с разной
+      // только группой. Ключ свёртки: subject + room + teacher + lessontype.
+      const grouped = new Map();
       for (const flow of slot.flows || []) {
-        lessons.push({
-          pair: pairNum,
-          start: time.start,
-          end: time.end,
-          subject: clean(flow.subject),
-          lessontype: clean(flow.lessontype),
-          teacher: clean(flow.teacher),
-          room: clean(flow.room),
+        const subject = clean(flow.subject);
+        const lessontype = clean(flow.lessontype);
+        const teacher = clean(flow.teacher);
+        const room = clean(flow.room);
+        const key = `${subject}|${room}|${teacher}|${lessontype}`;
+        const audience = {
           flow: clean(flow.flow),
           group: clean(flow.group),
           subgroup: clean(flow.subgroup),
           course: clean(flow.course),
-        });
+        };
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            pair: pairNum,
+            start: time.start,
+            end: time.end,
+            subject, lessontype, teacher, room,
+            // Совместимость: одиночные поля = первый адресат.
+            flow: audience.flow,
+            group: audience.group,
+            subgroup: audience.subgroup,
+            course: audience.course,
+            audiences: [audience],
+          });
+        } else {
+          grouped.get(key).audiences.push(audience);
+        }
       }
+      for (const lesson of grouped.values()) lessons.push(lesson);
     }
     lessons.sort((a, b) => a.pair - b.pair);
     byDate[dateKey] = lessons;

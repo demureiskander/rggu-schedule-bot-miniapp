@@ -3,16 +3,16 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=39';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=39';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=39';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=39';
-import { applyTheme } from './theme.js?v=39';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=39';
+} from './api.js?v=40';
+import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=40';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=40';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=40';
+import { applyTheme } from './theme.js?v=40';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=40';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=39';
+} from './render.js?v=40';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -400,6 +400,9 @@ export function renderSchedule(mount, params, router) {
   // обращается к nextDirection; если объявить ниже, на первый sync-вызов попадаем
   // в TDZ и весь catch ловит ReferenceError вместо реальной ошибки.
   let nextDirection = null;
+  // Флаг: при следующем draw() в weekly-режиме проскроллить к выбранному дню.
+  // Ставится в selectDate (тап по дате/ячейке в strip); сбрасывается после скролла.
+  let nextScrollToSelected = false;
 
   load();
 
@@ -504,6 +507,7 @@ export function renderSchedule(mount, params, router) {
     const cmp = date.getTime() - selected.getTime();
     nextDirection = cmp > 0 ? 'forward' : cmp < 0 ? 'backward' : null;
     selected = date;
+    nextScrollToSelected = true;
     draw();
   }
 
@@ -604,18 +608,28 @@ export function renderSchedule(mount, params, router) {
     // отрисовке). Если «сегодня» лежит между min..max, оно гарантированно
     // оказывается в ленте — иначе кнопка «Сегодня» не имела бы куда прыгнуть.
     const hasLessons = (d) => (schedule.byDate[tsToDateKey(d)] || []).length > 0;
-    const days = [];
-    for (let t = min; t <= max; ) {
-      const d = new Date(t);
-      days.push(d);
-      const next = new Date(d);
-      next.setDate(next.getDate() + 1);
-      t = next.getTime();
-    }
-    // Полоска: в режиме «по неделям» подсвечиваем все 7 дней текущей недели мягким фоном.
     const monday = weekMonday(selected);
     const sunday = new Date(monday); sunday.setDate(sunday.getDate() + 6);
     const inCurrentWeek = (d) => d.getTime() >= monday.getTime() && d.getTime() <= sunday.getTime();
+
+    // В недельном режиме лента = ровно 7 дней текущей недели (без горизонтального
+    // скролла по семестру — иначе на разной ширине слева/справа просвечивают
+    // соседние недели, и тестеры видят «8 дней»). В дневном — весь диапазон.
+    const days = [];
+    if (isWeek) {
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday); d.setDate(monday.getDate() + i);
+        days.push(d);
+      }
+    } else {
+      for (let t = min; t <= max; ) {
+        const d = new Date(t);
+        days.push(d);
+        const next = new Date(d);
+        next.setDate(next.getDate() + 1);
+        t = next.getTime();
+      }
+    }
     screen.appendChild(weekStrip(days, selected, selectDate, {
       hasLessons, dimEmpty: get.highlightEmptyDays(),
       inRange: isWeek ? inCurrentWeek : null,
@@ -678,9 +692,11 @@ export function renderSchedule(mount, params, router) {
 
     const forecast = get.weatherEnabled() ? get.weather() : null;
     const wrap = h('<div class="week-days"></div>');
+    let selectedBlock = null;
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday); d.setDate(monday.getDate() + i);
       const isTodayDay = d.toDateString() === today.toDateString();
+      const isSelectedDay = d.toDateString() === selected.toDateString();
       const dayLessons = schedule.byDate[tsToDateKey(d)] || [];
       const dayBlock = h('<div class="week-day"></div>');
       const dayWeather = forecast ? weatherForDate(forecast, d) : null;
@@ -697,9 +713,20 @@ export function renderSchedule(mount, params, router) {
         }
         dayBlock.appendChild(list);
       }
+      if (isSelectedDay) selectedBlock = dayBlock;
       wrap.appendChild(dayBlock);
     }
     body.appendChild(wrap);
+
+    // Тап по дате в полоске → скроллим к блоку выбранного дня. Откладываем на
+    // следующий кадр, чтобы DOM успел смонтироваться (block:start учитывает
+    // фиксированный header через scroll-margin-top в CSS).
+    if (selectedBlock && nextScrollToSelected) {
+      nextScrollToSelected = false;
+      requestAnimationFrame(() => {
+        selectedBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
   }
 
   // Свайп листает неделю (в недельном виде).

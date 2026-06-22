@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=39';
+} from './constants.js?v=40';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -38,22 +38,20 @@ export function lessonTypeInfo(type) {
   return { label, kind: 'other' };
 }
 
-// Строка «препод · ауд. N» (room/teacher могут быть пустыми после чистки '-').
-// В режиме просмотра расписания преподавателя — вместо ФИО показываем группу
-// и курс (полезная инфа: «кому он читает» вместо самого себя).
+// Подпись пары без аудитории (она вынесена в отдельную яркую строку, см. ниже).
+// В режиме преподавателя вместо ФИО — кому он читает.
 function metaLine(lesson, viewMode = 'group') {
-  if (viewMode === 'teacher') {
-    const audience = teacherAudience(lesson);
-    return [audience, lesson.room ? `ауд. ${lesson.room}` : '']
-      .filter(Boolean).join(' · ');
-  }
-  return [lesson.teacher, lesson.room ? `ауд. ${lesson.room}` : '']
-    .filter(Boolean).join(' · ');
+  if (viewMode === 'teacher') return teacherAudience(lesson);
+  return lesson.teacher || '';
 }
 
 // «Кому читает» в расписании преподавателя: курс + поток/группа.
-// Поле flow упстрим отдаёт как «1-Б-О ИАИ-ИФ-И-ИК» (код потока), group обычно '-'.
+// Поле flow upstream отдаёт как «1-Б-О ИАИ-ИФ-И-ИК» (код потока), group обычно '-'.
+// Если в паре несколько групп (lesson.audiences > 1) — короткая сводка «для N групп».
 function teacherAudience(lesson) {
+  if (Array.isArray(lesson.audiences) && lesson.audiences.length > 1) {
+    return `для ${lesson.audiences.length} ${plural(lesson.audiences.length, ['группы', 'групп', 'групп'])}`;
+  }
   const parts = [];
   if (lesson.course) parts.push(`${lesson.course} курс`);
   if (lesson.flow) parts.push(lesson.flow);
@@ -79,6 +77,7 @@ function renderBlock(lesson, viewMode) {
       <div class="lesson__time">${lesson.pair ? `${lesson.pair}-я пара · ` : ''}${esc(lesson.start)} — ${esc(lesson.end)}</div>
       <div class="lesson__title">${esc(lesson.subject)}</div>
       <div class="lesson__badge-row"><span class="badge badge--${kind}">${esc(label)}</span></div>
+      ${lesson.room ? `<div class="lesson__room"><span class="lesson__room-icon">📍</span><span class="lesson__room-text">${esc(lesson.room)}</span></div>` : ''}
       ${meta ? `<div class="lesson__meta">${esc(meta)}</div>` : ''}
     </button>
   `);
@@ -311,13 +310,27 @@ export function lessonDetail(lesson, stats, viewMode = 'group') {
   if (viewMode !== 'teacher' && lesson.teacher) {
     rows.push(['Преподаватель', lesson.teacher]);
   }
-  const groupBits = [
-    viewMode === 'teacher' && lesson.course ? `${lesson.course} курс` : '',
-    lesson.flow && `поток ${lesson.flow}`,
-    lesson.group && `группа ${lesson.group}`,
-    lesson.subgroup && `подгруппа ${lesson.subgroup}`,
+  // Если в паре было несколько групп (typically teacher-режим: «читает у N групп
+  // одновременно») — перечисляем все. Иначе — одна строка по lesson.*.
+  const audiences = Array.isArray(lesson.audiences) && lesson.audiences.length
+    ? lesson.audiences
+    : [{ flow: lesson.flow, group: lesson.group, subgroup: lesson.subgroup, course: lesson.course }];
+  const formatAudience = (a) => [
+    viewMode === 'teacher' && a.course ? `${a.course} курс` : '',
+    a.flow && `поток ${a.flow}`,
+    a.group && `группа ${a.group}`,
+    a.subgroup && `подгруппа ${a.subgroup}`,
   ].filter(Boolean).join(', ');
-  if (groupBits) rows.push([viewMode === 'teacher' ? 'Для кого' : 'Группа', groupBits]);
+  const audienceLines = audiences.map(formatAudience).filter(Boolean);
+  if (audienceLines.length === 1) {
+    rows.push([viewMode === 'teacher' ? 'Для кого' : 'Группа', audienceLines[0]]);
+  } else if (audienceLines.length > 1) {
+    // Несколько групп: первая строка с заголовком, остальные — продолжением.
+    const label = viewMode === 'teacher' ? 'Для кого' : 'Группа';
+    audienceLines.forEach((line, i) => {
+      rows.push([i === 0 ? `${label} (${audienceLines.length})` : '', line]);
+    });
+  }
 
   const wrap = h(`
     <div class="detail">
