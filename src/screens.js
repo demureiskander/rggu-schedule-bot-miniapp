@@ -3,19 +3,19 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=42';
+} from './api.js?v=43';
 import {
   formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails,
   MONTHS_GENITIVE, MONTHS_NOMINATIVE, WEEKDAYS_SHORT,
-} from './constants.js?v=42';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=42';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=42';
-import { applyTheme } from './theme.js?v=42';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=42';
+} from './constants.js?v=43';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=43';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=43';
+import { applyTheme } from './theme.js?v=43';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=43';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=42';
+} from './render.js?v=43';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -1162,7 +1162,10 @@ export function renderSchedule(mount, params, router) {
     content.appendChild(h('<div class="settings__label">Поддержать проект ☕</div>'));
     content.appendChild(h('<div class="settings__hint">Если приложение полезно — буду рад поддержке</div>'));
     const support = h('<div class="settings__list"></div>');
-    support.appendChild(linkRow('⭐', 'Telegram Stars', '', () => openTelegramLink('https://t.me/RsuhSpaceBot')));
+    // Deep link с параметром coffee: бот ловит /start coffee и сразу
+    // открывает оплату Stars'ами. Mini App при этом закрывается — пользователь
+    // оказывается в чате с ботом, и обработка идёт уже на стороне бота.
+    support.appendChild(linkRow('⭐', 'Telegram Stars', '', () => openTelegramLink('https://t.me/RsuhSpaceBot?start=coffee')));
     support.appendChild(linkRow('💳', 'Cloudtips', 'рублями по СБП', () => openLink('https://pay.cloudtips.ru/p/b5c9b884')));
     content.appendChild(support);
 
