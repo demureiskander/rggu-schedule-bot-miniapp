@@ -2,12 +2,12 @@
 // Persistence: Telegram CloudStorage (синхронизируется между устройствами) с
 // fallback на localStorage. В памяти держим текущее состояние и кэш расписания.
 
-import { cloudGet, cloudSet, hasCloudStorage } from './telegram.js?v=43';
+import { cloudGet, cloudSet, hasCloudStorage } from './telegram.js?v=44';
 
 const LS_PREFIX = 'rsuhspace:';
 
 // Ключи, которые персистим.
-const PERSIST_KEYS = ['group', 'layout', 'displayMode', 'theme', 'weatherEnabled', 'highlightEmptyDays'];
+const PERSIST_KEYS = ['group', 'layout', 'displayMode', 'theme', 'weatherEnabled', 'highlightEmptyDays', 'attendance'];
 
 // Ключи, реально найденные в хранилище при loadState (для «первого запуска»).
 const persistedKeys = new Set();
@@ -22,6 +22,11 @@ const state = {
   theme: 'dark',          // 'dark' | 'light'
   weatherEnabled: false,  // boolean
   highlightEmptyDays: true, // boolean — серое выделение дней без пар
+  // Посещаемость: { [subject]: { [dateKey 'ДД.ММ.ГГГГ']: { status, note? } } }
+  // status: 'present' | 'absent'. Если ключа нет — статус «не отмечено».
+  // Хранится в CloudStorage (4KB лимит на ключ — для типичных 10–15 предметов
+  // помещается), c зеркалом в localStorage. JSON-сериализация.
+  attendance: {},
 
   // Сессионное (не персистим):
   schedule: null,         // { byDate: { 'ДД.ММ.ГГГГ': [lesson...] }, dates: [...], fetchedAt }
@@ -62,12 +67,13 @@ async function writePersisted(key, value) {
 // --- сериализация значений ---
 
 function serialize(key, value) {
-  return key === 'group' ? JSON.stringify(value) : String(value);
+  if (key === 'group' || key === 'attendance') return JSON.stringify(value);
+  return String(value);
 }
 
 function deserialize(key, raw) {
   if (raw == null) return undefined;
-  if (key === 'group') {
+  if (key === 'group' || key === 'attendance') {
     try { return JSON.parse(raw); } catch (_) { return undefined; }
   }
   if (key === 'weatherEnabled' || key === 'highlightEmptyDays') return raw === 'true';
@@ -121,7 +127,26 @@ export const get = {
   highlightEmptyDays: () => state.highlightEmptyDays,
   schedule: () => state.schedule,
   weather: () => state.weather,
+  attendance: () => state.attendance || {},
 };
+
+// Точечный апдейт посещаемости: одна ячейка [subject][dateKey] = {status, note?}.
+// Передан null/undefined как status — запись удаляется. Сразу пишется в store
+// и в persistence.
+export async function setAttendanceCell(subject, dateKey, status, note) {
+  const att = { ...(state.attendance || {}) };
+  const day = { ...(att[subject] || {}) };
+  if (status == null) {
+    delete day[dateKey];
+  } else {
+    day[dateKey] = note ? { status, note } : { status };
+  }
+  if (Object.keys(day).length) att[subject] = day;
+  else delete att[subject];
+  state.attendance = att;
+  persistedKeys.add('attendance');
+  await writePersisted('attendance', JSON.stringify(att));
+}
 
 // Устанавливает персистентное поле и сохраняет его.
 export async function set(key, value) {

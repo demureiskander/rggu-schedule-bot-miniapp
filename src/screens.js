@@ -3,19 +3,20 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=43';
+} from './api.js?v=44';
 import {
   formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails,
-  MONTHS_GENITIVE, MONTHS_NOMINATIVE, WEEKDAYS_SHORT,
-} from './constants.js?v=43';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=43';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=43';
-import { applyTheme } from './theme.js?v=43';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=43';
+  MONTHS_GENITIVE, MONTHS_NOMINATIVE, WEEKDAYS_SHORT, WEEKDAYS_FULL,
+  instituteAbbr, instituteName, instituteIcon,
+} from './constants.js?v=44';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=44';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather, setAttendanceCell } from './store.js?v=44';
+import { applyTheme } from './theme.js?v=44';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=44';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=43';
+} from './render.js?v=44';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -629,6 +630,16 @@ export function renderSchedule(mount, params, router) {
       const todayBtn = h('<button class="today-btn">Сегодня</button>');
       todayBtn.addEventListener('click', goToday);
       right.appendChild(todayBtn);
+    }
+    // Профиль — только в режиме своей группы (в teacher-режиме своего профиля
+    // нет). Слева от шестерёнки настроек.
+    if (!isTeacher && group) {
+      const profileBtn = h('<button class="icon-btn" aria-label="Профиль">👤</button>');
+      profileBtn.addEventListener('click', () => {
+        haptic('light');
+        router.navigate('profile', { group });
+      });
+      right.appendChild(profileBtn);
     }
     const gear = h('<button class="icon-btn" aria-label="Настройки">⚙</button>');
     gear.addEventListener('click', () => openSettings());
@@ -1311,6 +1322,370 @@ export function renderSchedule(mount, params, router) {
 
 // Сессионный кэш списка преподавателей (1600 шт., грузим один раз).
 let teachersCache = null;
+
+// =========================================================
+// 6.4 Профиль: данные о группе + экзамены + статистика семестра + посещаемость
+// =========================================================
+
+// Является ли пара экзаменом/зачётом по типу. Считаем все варианты написания.
+function isExamLike(lessontype) {
+  const t = (lessontype || '').toLowerCase();
+  return t.includes('экзамен') || t.includes('зачет') || t.includes('зачёт');
+}
+
+// Двузначная дата вида "03.02". new Date(timestamp) → берёт месяц/день.
+function pad2(n) { return String(n).padStart(2, '0'); }
+function shortDate(date) {
+  return `${pad2(date.getDate())}.${pad2(date.getMonth() + 1)}, ${WEEKDAYS_SHORT[date.getDay()]}`;
+}
+
+// Простой тултип на тап по элементу (для ℹ️ значков). Использует Web Animations
+// API для плавного появления, прячется по тайм-ауту.
+function attachTip(triggerEl, text) {
+  const tip = h(`<span class="tip-bubble" role="tooltip">${esc(text)}</span>`);
+  triggerEl.classList.add('info-tip-wrap');
+  triggerEl.appendChild(tip);
+  let timer = null;
+  triggerEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    tip.classList.add('tip-bubble--on');
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => tip.classList.remove('tip-bubble--on'), 3500);
+  });
+}
+
+export function renderProfile(mount, params, router) {
+  const group = params.group || get.group();
+  if (!group) {
+    // Без выбранной группы профиль показывать нечего — отправляем в picker.
+    router.reset('picker', { step: 'form' });
+    return;
+  }
+
+  const screen = h('<section class="profile stack"></section>');
+  mount.appendChild(screen);
+
+  let schedule = null;
+  load();
+
+  async function load() {
+    drawHeader('Загружаю профиль…');
+    try {
+      let data = getFreshSchedule(group.id);
+      if (!isValid(data)) {
+        data = await fetchSchedule(group.id, group.form, group.year);
+        setScheduleFor(group.id, data);
+      }
+      schedule = data;
+      drawAll();
+    } catch (_) {
+      drawError();
+    }
+  }
+
+  function isValid(d) {
+    return Boolean(d && Array.isArray(d.dates) && d.byDate && typeof d.byDate === 'object');
+  }
+
+  function drawHeader(loadingNote) {
+    screen.innerHTML = '';
+    screen.appendChild(h(`
+      <header class="profile-head">
+        <button class="picker-back" aria-label="Назад">←</button>
+        <h2>Профиль</h2>
+      </header>
+    `));
+    screen.querySelector('.picker-back').addEventListener('click', () => {
+      haptic('light'); router.back();
+    });
+    if (loadingNote) {
+      screen.appendChild(h(`<div class="profile-loading">${esc(loadingNote)}</div>`));
+    }
+  }
+
+  function drawError() {
+    drawHeader();
+    screen.appendChild(mascotBlock({
+      pose: 'sad',
+      title: 'Не получилось загрузить профиль',
+      subtitle: 'Похоже, пропала связь. Попробуй ещё раз.',
+      actions: [
+        { label: 'Попробовать снова', onClick: load },
+        { label: 'Назад к расписанию', variant: 'ghost', onClick: () => router.back() },
+      ],
+    }));
+  }
+
+  function drawAll() {
+    drawHeader();
+    screen.appendChild(buildStudentBlock(group, router));
+    screen.appendChild(buildExamsBlock(schedule));
+    screen.appendChild(buildStatsBlock(schedule));
+    screen.appendChild(buildAttendanceBlock(schedule));
+  }
+}
+
+// ── Блок «Студент» ──
+function buildStudentBlock(group, router) {
+  const { direction, profile: profileTitle } = splitDetails(group.details);
+  const abbr = instituteAbbr(group.name);
+  const inst = instituteName(abbr);
+  const icon = instituteIcon(abbr);
+  const formCode = GROUP_FORMS[group.form] || '';
+  const formLabel = formatFormCode(formCode); // «Бакалавриат, очная»
+  // Курс + lowercased форма: «2 курс · бакалавриат · очная».
+  const formLower = formLabel ? formLabel.toLowerCase().replace(/,\s*/g, ' · ') : '';
+  const courseLevel = `${group.year} курс${formLower ? ' · ' + formLower : ''}`;
+  // Имя направления (если есть) первичный заголовок; иначе код группы как fallback.
+  const headline = direction || group.name;
+
+  const block = h(`
+    <section class="profile-block">
+      <div class="profile-block__title">Студент</div>
+      <div class="profile-block__card">
+        <div class="profile-student">
+          <div class="profile-student__direction">${esc(headline)}</div>
+          <div class="profile-student__details">${esc(courseLevel)}</div>
+          <div class="profile-student__institute">${esc(icon)} ${esc(inst.name)}</div>
+          ${profileTitle ? `<div class="profile-student__profile muted">${esc(profileTitle)}</div>` : ''}
+          <div class="profile-student__group muted">Группа ${esc(group.name)}</div>
+          <button class="btn btn--ghost btn--block profile-student__change">Изменить группу</button>
+        </div>
+      </div>
+    </section>
+  `);
+  block.querySelector('.profile-student__change').addEventListener('click', () => {
+    haptic('light');
+    router.reset('picker', { step: 'form' });
+  });
+  return block;
+}
+
+// ── Блок «Экзамены» ──
+function buildExamsBlock(schedule) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const exams = [];
+  for (const dateKey of schedule.dates) {
+    const ts = dateKeyToTs(dateKey);
+    for (const l of schedule.byDate[dateKey] || []) {
+      if (isExamLike(l.lessontype)) exams.push({ dateKey, ts, lesson: l });
+    }
+  }
+  exams.sort((a, b) => a.ts - b.ts);
+
+  const block = h(`
+    <section class="profile-block">
+      <div class="profile-block__title">Экзамены</div>
+      <div class="profile-block__card"></div>
+    </section>
+  `);
+  const card = block.querySelector('.profile-block__card');
+
+  if (!exams.length) {
+    card.appendChild(h('<div class="profile-empty">Экзамены не найдены в расписании.</div>'));
+    return block;
+  }
+
+  const remaining = exams.filter((e) => e.ts >= today.getTime()).length;
+  const counter = h(`
+    <div class="exams-counter">
+      <span>Осталось <strong>${remaining}</strong> из ${exams.length}</span>
+      <button class="info-tip" aria-label="Что значит счётчик?">ℹ️</button>
+    </div>
+  `);
+  attachTip(counter.querySelector('.info-tip'),
+    'Считается по дате — прошёл день экзамена или нет, не по факту сдачи.');
+  card.appendChild(counter);
+
+  const list = h('<div class="exam-list"></div>');
+  for (const e of exams) {
+    const past = e.ts < today.getTime();
+    const d = new Date(e.ts);
+    const meta = [e.lesson.room, e.lesson.teacher].filter(Boolean).join(' · ');
+    list.appendChild(h(`
+      <div class="exam-row${past ? ' exam-row--past' : ''}">
+        <div class="exam-row__date">${esc(shortDate(d))}</div>
+        <div class="exam-row__subject">${esc(e.lesson.subject)}</div>
+        ${meta ? `<div class="exam-row__meta">${esc(meta)}</div>` : ''}
+      </div>
+    `));
+  }
+  card.appendChild(list);
+  return block;
+}
+
+// ── Блок «Статистика семестра» ──
+function buildStatsBlock(schedule) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let total = 0, remaining = 0;
+  let lectures = 0, seminars = 0, examsZachet = 0;
+  let daysWithLessons = 0, daysPassed = 0;
+  for (const dateKey of schedule.dates) {
+    const ts = dateKeyToTs(dateKey);
+    const lessons = schedule.byDate[dateKey] || [];
+    if (lessons.length) {
+      daysWithLessons++;
+      if (ts < today.getTime()) daysPassed++;
+    }
+    for (const l of lessons) {
+      total++;
+      if (ts >= today.getTime()) remaining++;
+      const t = (l.lessontype || '').toLowerCase();
+      if (isExamLike(l.lessontype)) examsZachet++;
+      else if (t.includes('лек')) lectures++;
+      else if (t.includes('сем')) seminars++;
+    }
+  }
+  const pct = daysWithLessons > 0 ? Math.round((daysPassed / daysWithLessons) * 100) : 0;
+  const np = (n, forms) => `${n} ${pluralRu(n, forms)}`;
+
+  const breakdownParts = [
+    np(lectures, ['лекция', 'лекции', 'лекций']),
+    np(seminars, ['семинар', 'семинара', 'семинаров']),
+    np(examsZachet, ['экзамен/зачёт', 'экзамена/зачёта', 'экзаменов/зачётов']),
+  ];
+
+  return h(`
+    <section class="profile-block">
+      <div class="profile-block__title">Статистика семестра</div>
+      <div class="profile-block__card">
+        <div class="stat-row"><span>Всего пар</span><strong>${total}</strong></div>
+        <div class="stat-row"><span>Осталось</span><strong>${remaining}</strong></div>
+        <div class="stat-row stat-row--col">
+          <span class="muted">Из них</span>
+          <span>${esc(breakdownParts.join(' · '))}</span>
+        </div>
+        <div class="progress"><div class="progress__bar" style="width:${pct}%"></div></div>
+        <div class="progress-label">Семестр пройден на <strong>${pct}%</strong></div>
+      </div>
+    </section>
+  `);
+}
+
+// Локальная плюрализация (хелпер render.js не экспортирован).
+function pluralRu(n, forms) {
+  const a = Math.abs(n) % 100;
+  const b = a % 10;
+  if (a > 10 && a < 20) return forms[2];
+  if (b > 1 && b < 5) return forms[1];
+  if (b === 1) return forms[0];
+  return forms[2];
+}
+
+// ── Блок «Посещаемость» ──
+// Аккордеоны по предметам. Циклическое переключение статуса:
+//   ○ (не отмечено) → ✅ (был) → ❌ (не был) → ○
+// Будущие даты — без статуса, только дата. Изменения сразу пишутся через
+// setAttendanceCell (CloudStorage + localStorage mirror).
+function buildAttendanceBlock(schedule) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayTs = today.getTime();
+
+  // Группируем все даты по предмету (без экзаменов/зачётов).
+  const bySubject = new Map();
+  for (const dateKey of schedule.dates) {
+    const ts = dateKeyToTs(dateKey);
+    for (const l of schedule.byDate[dateKey] || []) {
+      if (isExamLike(l.lessontype)) continue;
+      if (!bySubject.has(l.subject)) bySubject.set(l.subject, new Map());
+      // Map по dateKey, чтобы исключить дубли в один день (две пары одного предмета).
+      const dayMap = bySubject.get(l.subject);
+      if (!dayMap.has(dateKey)) dayMap.set(dateKey, ts);
+    }
+  }
+
+  const block = h(`
+    <section class="profile-block">
+      <div class="profile-block__title">Посещаемость</div>
+      <div class="profile-block__card"></div>
+    </section>
+  `);
+  const card = block.querySelector('.profile-block__card');
+
+  if (!bySubject.size) {
+    card.appendChild(h('<div class="profile-empty">Предметы в расписании не найдены.</div>'));
+    return block;
+  }
+
+  const attendance = get.attendance();
+  const list = h('<div class="attend-list"></div>');
+
+  // Сортируем по алфавиту имени предмета.
+  const subjects = [...bySubject.keys()].sort((a, b) => a.localeCompare(b, 'ru'));
+
+  for (const subject of subjects) {
+    const dates = [...bySubject.get(subject).entries()].sort((a, b) => a[1] - b[1]);
+    // [ [dateKey, ts], ... ]
+    const subjectData = attendance[subject] || {};
+    const presentCount = dates.reduce((s, [k]) =>
+      s + (subjectData[k]?.status === 'present' ? 1 : 0), 0);
+    const pastCount = dates.filter(([, ts]) => ts < todayTs).length;
+
+    const item = h(`
+      <div class="attend-item">
+        <button class="attend-item__head" aria-expanded="false">
+          <span class="attend-item__subject">${esc(subject)}</span>
+          <span class="attend-item__counter">Посетил ${presentCount} из ${pastCount}</span>
+          <span class="attend-item__chev">›</span>
+        </button>
+        <div class="attend-item__body"></div>
+      </div>
+    `);
+    const head = item.querySelector('.attend-item__head');
+    const body = item.querySelector('.attend-item__body');
+    const counterEl = item.querySelector('.attend-item__counter');
+
+    head.addEventListener('click', () => {
+      haptic('light');
+      const open = item.classList.toggle('attend-item--open');
+      head.setAttribute('aria-expanded', String(open));
+    });
+
+    // Рендерим строки дат (лениво, чтобы не плодить DOM до открытия? Оставим
+    // eager — типично 10-30 дат на предмет, не критично).
+    for (const [dateKey, ts] of dates) {
+      const d = new Date(ts);
+      const isFuture = ts > todayTs;
+      const cell = subjectData[dateKey] || {};
+      const row = h(`
+        <div class="attend-row${isFuture ? ' attend-row--future' : ''}">
+          <span class="attend-row__date">${esc(shortDate(d))}</span>
+          ${isFuture
+            ? '<span class="attend-row__future-mark muted">впереди</span>'
+            : `<button class="attend-status attend-status--${cell.status || 'none'}" aria-label="Сменить статус">
+                 ${statusGlyph(cell.status)}
+               </button>`}
+        </div>
+      `);
+      if (!isFuture) {
+        const statusBtn = row.querySelector('.attend-status');
+        statusBtn.addEventListener('click', async () => {
+          haptic('light');
+          const cur = (subjectData[dateKey] || {}).status || null;
+          const nextStatus = cur === null ? 'present' : cur === 'present' ? 'absent' : null;
+          await setAttendanceCell(subject, dateKey, nextStatus);
+          if (nextStatus === null) delete subjectData[dateKey];
+          else subjectData[dateKey] = { status: nextStatus };
+          statusBtn.className = `attend-status attend-status--${nextStatus || 'none'}`;
+          statusBtn.innerHTML = statusGlyph(nextStatus);
+          const newPresent = dates.reduce((s, [k]) =>
+            s + (subjectData[k]?.status === 'present' ? 1 : 0), 0);
+          counterEl.textContent = `Посетил ${newPresent} из ${pastCount}`;
+        });
+      }
+      body.appendChild(row);
+    }
+    list.appendChild(item);
+  }
+  card.appendChild(list);
+  return block;
+}
+
+function statusGlyph(status) {
+  if (status === 'present') return '✅';
+  if (status === 'absent') return '❌';
+  return '○';
+}
 
 // Строка-ссылка для настроек (поддержать, о приложении). Иконка слева как
 // акцент, текст по центру, шеврон справа. onClick — обработчик нажатия.

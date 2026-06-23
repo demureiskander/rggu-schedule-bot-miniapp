@@ -24,6 +24,9 @@
   --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.30);
   --shadow-mid: 0 12px 48px rgba(0, 0, 0, 0.5);
   --sheet-overlay: rgba(8, 6, 14, 0.7);
+
+  /* Лёгкая полупрозрачная подложка карточек — «парит» над основным фоном. */
+  --card-bg: rgba(255, 255, 255, 0.04);
 }
 
 /* --- Светлая тема. --- */
@@ -46,6 +49,8 @@
   --shadow-soft: 0 2px 8px rgba(26, 21, 48, 0.05);
   --shadow-mid: 0 12px 48px rgba(0, 0, 0, 0.12);
   --sheet-overlay: rgba(246, 244, 251, 0.5);
+
+  --card-bg: rgba(0, 0, 0, 0.03);
 }
 
 /* --- Spacing / radius шкалы (для справки и утилит) --- */
@@ -525,25 +530,27 @@ h2 { font-size: 20px; }
 .dot--other   { background: var(--text-dim); }
 
 /* --- Блочный вид --- */
-.lessons--block { display: flex; flex-direction: column; gap: 10px; }
+.lessons--block { display: flex; flex-direction: column; gap: 8px; }
 .lesson--block {
   display: block;
   width: 100%;
   text-align: left;
-  background: var(--surface);
+  background: var(--card-bg);
   border: none;
-  border-left: 4px solid var(--amber);
-  border-radius: 14px;
-  padding: 14px 14px 14px 18px;
+  /* Акцентная линия с 2px отступом от левого края карточки — даём ей «дышать»,
+     карточка кажется менее плоской. Реализовано через box-shadow inset, чтобы
+     не двигать содержимое. */
+  border-radius: 12px;
+  padding: 14px 14px 14px 16px;
+  box-shadow: inset 4px 0 0 var(--amber), var(--shadow-soft);
   color: var(--text);
   font-family: inherit;
   cursor: pointer;
-  box-shadow: var(--shadow-soft);
   transition: transform 0.08s ease;
 }
-.lesson--block.kind-seminar { border-left-color: var(--seminar); }
-.lesson--block.kind-other { border-left-color: var(--text-dim); }
-.lesson--block.kind-lecture-seminar { border-left-color: var(--seminar); border-image: linear-gradient(var(--amber), var(--seminar)) 1; }
+.lesson--block.kind-seminar { box-shadow: inset 4px 0 0 var(--seminar), var(--shadow-soft); }
+.lesson--block.kind-other { box-shadow: inset 4px 0 0 var(--text-dim), var(--shadow-soft); }
+.lesson--block.kind-lecture-seminar { box-shadow: inset 4px 0 0 var(--seminar), var(--shadow-soft); }
 .lesson--block:active { transform: scale(0.99); }
 .lesson__time { font-size: 11px; color: var(--text-muted); font-weight: 500; }
 .lesson__title { font-size: 16px; font-weight: 600; margin-top: 5px; }
@@ -648,7 +655,15 @@ h2 { font-size: 20px; }
   padding: 0 var(--sp-4);
 }
 
-.feed { display: flex; flex-direction: column; gap: var(--sp-5); padding-bottom: 48px; }
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+  padding-bottom: 48px;
+  /* справа — место под scrubber-track (ширина scrubber'а 28px + 6px от края),
+     чтобы карточки не залезали под ползунок. */
+  padding-right: 20px;
+}
 
 .feed-month { display: flex; flex-direction: column; gap: var(--sp-3); }
 .feed-month__head {
@@ -666,7 +681,7 @@ h2 { font-size: 20px; }
   letter-spacing: 1.5px;
   border-bottom: 1px solid var(--border);
 }
-.feed-month__days { display: flex; flex-direction: column; gap: var(--sp-4); }
+.feed-month__days { display: flex; flex-direction: column; gap: var(--sp-5); }
 
 /* scroll-margin = высота sticky-sched-top (44) + месяца (~36) + breathing room. */
 .feed-day { display: flex; flex-direction: column; gap: var(--sp-2); scroll-margin-top: 96px; }
@@ -1026,3 +1041,218 @@ h2 { font-size: 20px; }
 .link-row__label { font-size: 14px; font-weight: 500; }
 .link-row__sub { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
 .link-row__chev { color: var(--text-dim); font-size: 18px; line-height: 1; }
+
+/* ============================================================
+   Экран «Профиль»: блоки «Студент / Экзамены / Статистика / Посещаемость»
+   ============================================================ */
+.profile { padding-top: var(--sp-3); gap: var(--sp-6); }
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+.profile-head h2 { margin: 0; }
+.profile-loading {
+  text-align: center;
+  color: var(--text-muted);
+  padding: var(--sp-6) 0;
+}
+
+.profile-block { display: flex; flex-direction: column; gap: var(--sp-2); }
+.profile-block__title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding-left: var(--sp-1);
+}
+.profile-block__card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.profile-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: var(--sp-2) 0;
+}
+
+/* — Блок «Студент» — */
+.profile-student { display: flex; flex-direction: column; gap: 6px; }
+.profile-student__direction { font-size: 18px; font-weight: 700; color: var(--text); }
+.profile-student__details { font-size: 13px; color: var(--text-muted); }
+.profile-student__institute { font-size: 14px; color: var(--text); margin-top: 4px; }
+.profile-student__profile { font-size: 12px; }
+.profile-student__group { font-size: 12px; margin-bottom: var(--sp-2); }
+.profile-student__change { margin-top: var(--sp-2); }
+
+/* — Блок «Экзамены» — */
+.exams-counter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--text);
+}
+.exams-counter strong { color: var(--amber); }
+.info-tip {
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  position: relative;
+}
+.info-tip:active { background: rgba(255,255,255,0.05); }
+.info-tip-wrap { position: relative; }
+.tip-bubble {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 12;
+  width: 240px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+  border-radius: 10px;
+  box-shadow: var(--shadow-mid);
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+.tip-bubble--on { opacity: 1; transform: translateY(0); }
+
+.exam-list { display: flex; flex-direction: column; gap: var(--sp-3); }
+.exam-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: var(--sp-3);
+  border-left: 3px solid var(--amber);
+}
+.exam-row__date { font-size: 12px; font-weight: 600; color: var(--amber); }
+.exam-row__subject { font-size: 14px; font-weight: 600; color: var(--text); }
+.exam-row__meta { font-size: 12px; color: var(--text-muted); }
+.exam-row--past { opacity: 0.45; border-left-color: var(--text-dim); }
+.exam-row--past .exam-row__date {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+/* — Блок «Статистика семестра» — */
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-3);
+  font-size: 14px;
+  color: var(--text);
+}
+.stat-row strong { font-weight: 700; }
+.stat-row--col { flex-direction: column; align-items: flex-start; gap: 2px; }
+.progress {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: var(--sp-2);
+}
+.progress__bar {
+  height: 100%;
+  background: var(--amber);
+  border-radius: 3px;
+  transition: width 280ms ease-out;
+}
+.progress-label {
+  text-align: right;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.progress-label strong { color: var(--amber); }
+
+/* — Блок «Посещаемость» — */
+.attend-list { display: flex; flex-direction: column; }
+.attend-item {
+  border-bottom: 1px solid var(--border);
+}
+.attend-item:last-child { border-bottom: none; }
+.attend-item__head {
+  width: 100%;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) 0;
+  text-align: left;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+}
+.attend-item__subject {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attend-item__counter {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.attend-item__chev {
+  color: var(--text-dim);
+  font-size: 18px;
+  width: 14px;
+  text-align: center;
+  transition: transform 160ms ease;
+}
+.attend-item--open .attend-item__chev { transform: rotate(90deg); }
+.attend-item__body {
+  display: none;
+  padding: 0 0 var(--sp-3);
+  flex-direction: column;
+}
+.attend-item--open .attend-item__body { display: flex; }
+
+.attend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sp-2) 0;
+  border-top: 1px dashed var(--border);
+  font-size: 13px;
+}
+.attend-row:first-child { border-top: none; }
+.attend-row__date { color: var(--text); font-weight: 500; }
+.attend-row__future-mark { font-size: 11px; }
+.attend-row--future { opacity: 0.55; }
+.attend-status {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease, transform 80ms ease;
+}
+.attend-status:active { transform: scale(0.95); }
+.attend-status--present { border-color: rgba(34,197,94,0.45); background: rgba(34,197,94,0.12); }
+.attend-status--absent  { border-color: rgba(239,68,68,0.45); background: rgba(239,68,68,0.12); }
+.attend-status--none    { color: var(--text-dim); }

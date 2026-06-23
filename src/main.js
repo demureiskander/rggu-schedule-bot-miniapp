@@ -1,9 +1,9 @@
 // Точка входа: инициализация SDK/темы/persistence + стек-роутер экранов.
 
-import { initWebApp, onBackButton, setBackVisible } from './telegram.js?v=43';
-import { loadState, get } from './store.js?v=43';
-import { applyTheme, resolveInitialTheme } from './theme.js?v=43';
-import * as screens from './screens.js?v=43';
+import { initWebApp, onBackButton, setBackVisible } from './telegram.js?v=44';
+import { loadState, get } from './store.js?v=44';
+import { applyTheme, resolveInitialTheme } from './theme.js?v=44';
+import * as screens from './screens.js?v=44';
 
 const appEl = document.getElementById('app');
 
@@ -12,6 +12,7 @@ const ROUTES = {
   welcome: screens.renderWelcome,
   picker: screens.renderPicker,
   schedule: screens.renderSchedule,
+  profile: screens.renderProfile,
 };
 
 // Сохранённая группа считается валидной, если есть форма, id и имя.
