@@ -2,8 +2,8 @@
 // Бот уже отдаёт нормализованный JSON (см. CLAUDE.md §4); здесь мы только
 // приводим расписание к удобной для рендера форме (карта по датам + тайм-слоты).
 
-import { API_BASE } from '../config.js?v=40';
-import { TIME_SLOTS } from './constants.js?v=40';
+import { API_BASE } from '../config.js?v=41';
+import { TIME_SLOTS } from './constants.js?v=41';
 
 // Унифицированный GET. Бросает Error при сетевой ошибке/не-2xx —
 // человекочитаемые сообщения для пользователя формируются в слое экранов.
@@ -90,14 +90,17 @@ function normalizeSchedule(data) {
       // который читает у нескольких групп одновременно (одно время, один
       // предмет, одна аудитория). Сворачиваем такие flows в одну карточку,
       // собирая «адресатов» (audiences) — иначе на экране дубли с разной
-      // только группой. Ключ свёртки: subject + room + teacher + lessontype.
+      // только группой. Ключ свёртки: subject + room + teacher + lessontype,
+      // нормализованные (lowercase + удаление пробелов): API иногда отдаёт
+      // «ЛЕК» и «лек», «708 (2)» и «708(2)» — это были бы разные ключи.
+      const normKey = (s) => (s || '').toLowerCase().replace(/\s+/g, '');
       const grouped = new Map();
       for (const flow of slot.flows || []) {
         const subject = clean(flow.subject);
         const lessontype = clean(flow.lessontype);
         const teacher = clean(flow.teacher);
         const room = clean(flow.room);
-        const key = `${subject}|${room}|${teacher}|${lessontype}`;
+        const key = `${normKey(subject)}|${normKey(room)}|${normKey(teacher)}|${normKey(lessontype)}`;
         const audience = {
           flow: clean(flow.flow),
           group: clean(flow.group),

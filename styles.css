@@ -396,9 +396,11 @@ h2 { font-size: 20px; }
    .day-cell (он содержит и __num, и __dow), а ограничивалась рядом чисел. */
 .week-strip__pill {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
   gap: 4px;
   isolation: isolate;
+  width: 100%;
 }
 .week-strip__pill::before {
   content: '';
@@ -408,6 +410,16 @@ h2 { font-size: 20px; }
   background: var(--surface-2);
   border-radius: 999px;
   z-index: -1;
+}
+/* В недельном режиме сама полоска не скроллится — 7 ячеек распределяются
+   равномерно по ширине, без обрезки последнего дня (Bug 1). */
+.week-strip--weekly {
+  overflow-x: hidden;
+}
+.week-strip--weekly .day-cell {
+  flex: initial;
+  min-width: 0;
+  width: 100%;
 }
 .week-strip--weekly .day-cell--in-range:not(.day-cell--today):not(.day-cell--sel) .day-cell__num {
   background: transparent;
@@ -531,9 +543,21 @@ h2 { font-size: 20px; }
 .lesson__badge-row { margin-top: 7px; }
 .lesson__meta { font-size: 12px; color: var(--text-dim); margin-top: 7px; }
 /* Аудитория — первое, что ищут глазами в расписании. Делаем заметной:
-   полный --text, чуть крупнее, иконка-пиктограмма слева, своя строка. */
-.lesson__room { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--text); }
-.lesson__room-icon { font-size: 13px; }
+   полный --text, 15px/700, иконка крупнее, тёплая полупрозрачная подложка —
+   чтобы выделялась так же, как имя преподавателя (Bug 4). */
+.lesson__room {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.10);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.lesson__room-icon { font-size: 14px; }
 .lesson__room-text { letter-spacing: 0.2px; }
 
 /* --- Компактный вид --- */
@@ -580,6 +604,124 @@ h2 { font-size: 20px; }
 .ribbon__card.kind-other { border-left-color: var(--text-dim); }
 .ribbon__card.kind-lecture-seminar { border-left-color: var(--seminar); border-image: linear-gradient(var(--amber), var(--seminar)) 1; }
 .ribbon__title { font-size: 14px; margin-top: 0; }
+
+/* ============================================================
+   Режим «Лента» — непрерывный скролл всего семестра, sticky-месяцы,
+   вертикальный скруббер справа.
+   ============================================================ */
+.sched-body--feed { position: relative; }
+
+.feed { display: flex; flex-direction: column; gap: var(--sp-5); padding-bottom: 48px; }
+
+.feed-month { display: flex; flex-direction: column; gap: var(--sp-3); }
+.feed-month__head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0 calc(-1 * var(--sp-4));
+  padding: 10px var(--sp-4) 8px;
+  background: var(--bg);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  border-bottom: 1px solid var(--border);
+}
+.feed-month__days { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+.feed-day { display: flex; flex-direction: column; gap: var(--sp-2); scroll-margin-top: 56px; }
+.feed-day__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 2px 0;
+}
+.feed-day__title { min-width: 0; }
+.feed-day__head .weather__icon { font-size: 13px; }
+.feed-day__head .weather__temp { font-size: 12px; }
+
+.feed-day--today .feed-day__head {
+  color: var(--amber);
+}
+.feed-day--today .feed-day__title::after {
+  content: '· сегодня';
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--amber);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+/* Пустые дни (без пар) — заголовок есть, но приглушённый, тело пустое. */
+.feed-day--empty .feed-day__head { opacity: 0.45; }
+
+/* Вертикальный ползунок-скруббер. Тонкий, полупрозрачный — не мешает. */
+.feed-scrubber {
+  position: fixed;
+  top: 96px;
+  right: 6px;
+  /* выше FAB (поиск преподавателя) — 56px кнопка + 20px отступ + breathing room. */
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  width: 28px;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  /* Контейнер не ловит тачи — иначе пользователь, скроллящий пальцем у правого
+     края экрана, всё время триггерил бы drag. Интерактивен только сам ползунок. */
+  pointer-events: none;
+}
+.feed-scrubber__track {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 4px;
+  background: var(--border);
+  border-radius: 999px;
+  opacity: 0.6;
+}
+.feed-scrubber__thumb {
+  position: absolute;
+  top: 0;
+  width: 16px;
+  height: 32px;
+  background: var(--amber);
+  border-radius: 999px;
+  box-shadow: var(--shadow-soft);
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  transition: transform 60ms linear, width 120ms ease, height 120ms ease;
+}
+.feed-scrubber--drag .feed-scrubber__thumb {
+  cursor: grabbing;
+  width: 18px;
+  height: 36px;
+  transition: width 120ms ease, height 120ms ease;
+}
+.feed-scrubber__tip {
+  position: absolute;
+  right: 32px;
+  transform: translateY(-50%);
+  padding: 6px 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: var(--shadow-mid);
+  transition: opacity 120ms ease;
+}
+.feed-scrubber__tip--on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .feed-scrubber__thumb, .feed-scrubber--drag .feed-scrubber__thumb { transition: none; }
+}
 
 /* --- Недельный вид: 7 дней друг под другом, листание неделями --- */
 .week-days { display: flex; flex-direction: column; gap: var(--sp-5); }

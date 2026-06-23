@@ -3,21 +3,24 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=40';
-import { formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails } from './constants.js?v=40';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=40';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=40';
-import { applyTheme } from './theme.js?v=40';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=40';
+} from './api.js?v=41';
+import {
+  formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails,
+  MONTHS_GENITIVE, MONTHS_NOMINATIVE, WEEKDAYS_SHORT,
+} from './constants.js?v=41';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=41';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=41';
+import { applyTheme } from './theme.js?v=41';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=41';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=40';
+} from './render.js?v=41';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
 };
-const DISPLAY_MODE_LABELS = { day: 'По дням', week: 'По неделям' };
+const DISPLAY_MODE_LABELS = { day: 'По дням', week: 'По неделям', feed: 'Лента' };
 
 // --- DOM-хелперы ---
 function h(html) {
@@ -400,9 +403,12 @@ export function renderSchedule(mount, params, router) {
   // обращается к nextDirection; если объявить ниже, на первый sync-вызов попадаем
   // в TDZ и весь catch ловит ReferenceError вместо реальной ошибки.
   let nextDirection = null;
-  // Флаг: при следующем draw() в weekly-режиме проскроллить к выбранному дню.
+  // Флаг: при следующем draw() в weekly/feed-режиме проскроллить к выбранному дню.
   // Ставится в selectDate (тап по дате/ячейке в strip); сбрасывается после скролла.
   let nextScrollToSelected = false;
+  // В режиме «Лента» один раз за жизнь экрана автоскроллим к сегодняшнему дню
+  // (после первой отрисовки). Дальше пользователь сам управляет скроллом.
+  let feedAutoscrolled = false;
 
   load();
 
@@ -504,19 +510,37 @@ export function renderSchedule(mount, params, router) {
 
   function selectDate(date) {
     hapticSelection();
-    const cmp = date.getTime() - selected.getTime();
-    nextDirection = cmp > 0 ? 'forward' : cmp < 0 ? 'backward' : null;
+    // В weekly/feed мы скроллим к выбранному дню — slide-анимация контента
+    // здесь не нужна (и мешает scrollIntoView правильно посчитать геометрию).
+    // В дневном режиме оставляем направление: вперёд/назад.
+    const mode = get.displayMode();
+    if (mode === 'day') {
+      const cmp = date.getTime() - selected.getTime();
+      nextDirection = cmp > 0 ? 'forward' : cmp < 0 ? 'backward' : null;
+    } else {
+      nextDirection = null;
+    }
     selected = date;
     nextScrollToSelected = true;
     draw();
   }
 
   // Прыжок на сегодняшний день (в пределах загруженного диапазона).
+  // В режиме «Лента» — плавный скролл к блоку сегодня, без перерисовки.
   function goToday() {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const { min, max } = rangeBounds();
     if (today.getTime() < min || today.getTime() > max) return;
     haptic('light');
+    if (get.displayMode() === 'feed') {
+      const todayKey = tsToDateKey(today);
+      const block = document.querySelector(`.feed-day[data-date-key="${todayKey}"]`);
+      if (block) {
+        block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        selected = today;
+        return;
+      }
+    }
     nextDirection = 'fade';
     selected = today;
     draw();
@@ -565,7 +589,9 @@ export function renderSchedule(mount, params, router) {
     const { min, max } = rangeBounds();
     const todayInRange = today.getTime() >= min && today.getTime() <= max;
     const layout = get.layout();
-    const isWeek = get.displayMode() === 'week';
+    const displayMode = get.displayMode();
+    const isWeek = displayMode === 'week';
+    const isFeed = displayMode === 'feed';
 
     // Баннер режима преподавателя — отличает от своего расписания.
     if (isTeacher) {
@@ -583,10 +609,11 @@ export function renderSchedule(mount, params, router) {
     }
 
     // Шапка: погода (если включена и день в пределах 16-дневного прогноза)
-    // слева — только в режиме «по дням». В недельном виде погода уезжает в
-    // заголовки каждого дня (drawWeeklyBody).
+    // слева — только в режиме «по дням». В недельном виде / ленте погода
+    // уезжает в заголовки каждого дня.
     const top = h('<div class="sched-top"></div>');
-    const headerWeather = (!isWeek && get.weatherEnabled())
+    const showHeaderWeather = !isWeek && !isFeed && get.weatherEnabled();
+    const headerWeather = showHeaderWeather
       ? weatherBadge(weatherForDate(get.weather(), selected)) : null;
     top.appendChild(headerWeather || h('<span></span>'));
     const right = h('<div class="sched-top__right"></div>');
@@ -600,6 +627,13 @@ export function renderSchedule(mount, params, router) {
     right.appendChild(gear);
     top.appendChild(right);
     screen.appendChild(top);
+
+    // Режим «Лента» — без полоски дней и навигации: сплошной скролл по всему
+    // семестру. Скроллбар-ползунок справа + sticky-заголовки месяцев.
+    if (isFeed) {
+      drawFeed(layout);
+      return;
+    }
 
     // Полоска дней — горизонтальный скролл по всему загруженному диапазону.
     // Дни генерируем сплошным интервалом от min до max (включая дни без пар
@@ -727,6 +761,194 @@ export function renderSchedule(mount, params, router) {
         selectedBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     }
+  }
+
+  // --- Режим «Лента»: сплошной скролл по всему семестру ---
+  function drawFeed(layout) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const todayKey = tsToDateKey(today);
+    const forecast = get.weatherEnabled() ? get.weather() : null;
+
+    // В feed-режиме нет strip/dayNav/счётчика — только тело с лентой и
+    // вертикальный ползунок справа.
+    const body = h('<div class="sched-body sched-body--feed"></div>');
+    applyEnterAnimation(body);
+    screen.appendChild(body);
+
+    const feed = h('<div class="feed"></div>');
+    let curMonthKey = null;
+    let curMonthDays = null;
+    for (const dateKey of schedule.dates) {
+      const d = new Date(dateKeyToTs(dateKey));
+      const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
+      if (monthKey !== curMonthKey) {
+        curMonthKey = monthKey;
+        const monthBlock = h(`
+          <section class="feed-month">
+            <header class="feed-month__head">${esc(MONTHS_NOMINATIVE[d.getMonth()])} ${d.getFullYear()}</header>
+            <div class="feed-month__days"></div>
+          </section>
+        `);
+        curMonthDays = monthBlock.querySelector('.feed-month__days');
+        feed.appendChild(monthBlock);
+      }
+      curMonthDays.appendChild(buildFeedDay(d, dateKey, todayKey, forecast, layout));
+    }
+    body.appendChild(feed);
+
+    // Вертикальный ползунок-индикатор — справа, поверх контента.
+    body.appendChild(createFeedScrubber(feed));
+
+    // Автоскролл к сегодняшнему дню (или к ближайшему доступному). Если
+    // сегодня вне диапазона — оставляем скролл там, где он был (как обычно
+    // делает прыжок-к-выбранному после selectDate).
+    if (!feedAutoscrolled) {
+      feedAutoscrolled = true;
+      requestAnimationFrame(() => {
+        const target = feed.querySelector(`.feed-day[data-date-key="${todayKey}"]`)
+          || feed.querySelector('.feed-day');
+        if (target) target.scrollIntoView({ block: 'start', behavior: 'auto' });
+      });
+    } else if (nextScrollToSelected) {
+      nextScrollToSelected = false;
+      const key = tsToDateKey(selected);
+      requestAnimationFrame(() => {
+        const target = feed.querySelector(`.feed-day[data-date-key="${key}"]`);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  }
+
+  // Один день в ленте — заголовок (+ погода) и список пар. Пустой день —
+  // только компактный заголовок с лёгким приглушением.
+  function buildFeedDay(date, dateKey, todayKey, forecast, layout) {
+    const lessons = schedule.byDate[dateKey] || [];
+    const isTodayDay = dateKey === todayKey;
+    const empty = lessons.length === 0;
+    const cls = `feed-day${isTodayDay ? ' feed-day--today' : ''}${empty && get.highlightEmptyDays() ? ' feed-day--empty' : ''}`;
+    const block = h(`<div class="${cls}" data-date-key="${esc(dateKey)}"></div>`);
+    const title = `${WEEKDAYS_SHORT[date.getDay()]}, ${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()]}`;
+    const head = h(`<div class="feed-day__head"><span class="feed-day__title">${esc(title)}</span></div>`);
+    if (forecast) {
+      const w = weatherForDate(forecast, date);
+      if (w) {
+        const wb = weatherBadge(w);
+        if (wb) head.appendChild(wb);
+      }
+    }
+    block.appendChild(head);
+    if (!empty) {
+      const list = h(`<div class="lessons lessons--${layout}"></div>`);
+      for (const lesson of lessons) {
+        const el = renderLesson(lesson, layout, isTeacher ? 'teacher' : 'group');
+        const card = el.matches('button') ? el : el.querySelector('button') || el;
+        card.addEventListener('click', () => openDetail(lesson));
+        list.appendChild(el);
+      }
+      block.appendChild(list);
+    }
+    return block;
+  }
+
+  // Вертикальный ползунок справа: индикатор позиции в семестре + drag для
+  // быстрой навигации. При перетаскивании рядом всплывает дата под пальцем.
+  function createFeedScrubber(feed) {
+    const scrubber = h(`
+      <div class="feed-scrubber" aria-hidden="true">
+        <div class="feed-scrubber__track"></div>
+        <div class="feed-scrubber__thumb"></div>
+        <div class="feed-scrubber__tip"></div>
+      </div>
+    `);
+    const track = scrubber.querySelector('.feed-scrubber__track');
+    const thumb = scrubber.querySelector('.feed-scrubber__thumb');
+    const tip = scrubber.querySelector('.feed-scrubber__tip');
+
+    let dragging = false;
+
+    function pageScrollRange() {
+      const root = document.scrollingElement || document.documentElement;
+      return Math.max(0, root.scrollHeight - window.innerHeight);
+    }
+    function pageScrollY() {
+      return window.scrollY || (document.scrollingElement || document.documentElement).scrollTop;
+    }
+    function setPageScroll(y, smooth = false) {
+      window.scrollTo({ top: y, behavior: smooth ? 'smooth' : 'auto' });
+    }
+
+    function updateFromScroll() {
+      if (!scrubber.isConnected) return;
+      const docH = pageScrollRange();
+      const pct = docH > 0 ? Math.max(0, Math.min(1, pageScrollY() / docH)) : 0;
+      const trackH = Math.max(0, track.clientHeight - thumb.clientHeight);
+      thumb.style.transform = `translateY(${pct * trackH}px)`;
+    }
+
+    // Ищет день, ближайший к верху viewport — отдаёт его dateKey для тултипа.
+    function dateAtViewportTop() {
+      const cells = feed.querySelectorAll('.feed-day[data-date-key]');
+      let best = null, bestDist = Infinity;
+      for (const el of cells) {
+        const r = el.getBoundingClientRect();
+        const dist = Math.abs(r.top);
+        if (dist < bestDist) { best = el; bestDist = dist; }
+      }
+      return best ? best.getAttribute('data-date-key') : null;
+    }
+    function showTip(visible) {
+      tip.classList.toggle('feed-scrubber__tip--on', visible);
+    }
+    function refreshTip() {
+      const key = dateAtViewportTop();
+      if (!key) return;
+      const [d, m] = key.split('.').map(Number);
+      tip.textContent = `${d} ${MONTHS_GENITIVE[m - 1]}`;
+      const thumbRect = thumb.getBoundingClientRect();
+      const scrubRect = scrubber.getBoundingClientRect();
+      tip.style.top = `${thumbRect.top - scrubRect.top + thumbRect.height / 2}px`;
+    }
+
+    function onDown(e) {
+      dragging = true;
+      try { thumb.setPointerCapture(e.pointerId); } catch (_) {}
+      scrubber.classList.add('feed-scrubber--drag');
+      showTip(true);
+      onMove(e);
+    }
+    function onMove(e) {
+      if (!dragging) return;
+      e.preventDefault();
+      const r = track.getBoundingClientRect();
+      const y = Math.max(0, Math.min(r.height, e.clientY - r.top));
+      const pct = r.height > 0 ? y / r.height : 0;
+      setPageScroll(pct * pageScrollRange());
+      updateFromScroll();
+      refreshTip();
+    }
+    function onUp(e) {
+      if (!dragging) return;
+      dragging = false;
+      try { thumb.releasePointerCapture(e.pointerId); } catch (_) {}
+      scrubber.classList.remove('feed-scrubber--drag');
+      // Прячем тултип чуть позже, чтобы пользователь успел увидеть финальную дату.
+      setTimeout(() => showTip(false), 400);
+    }
+
+    // Слушатели на самом ползунке — у контейнера pointer-events:none, иначе
+    // скролл пальцем у правого края экрана случайно ловил бы drag.
+    thumb.addEventListener('pointerdown', onDown);
+    thumb.addEventListener('pointermove', onMove);
+    thumb.addEventListener('pointerup', onUp);
+    thumb.addEventListener('pointercancel', onUp);
+
+    const onScroll = () => updateFromScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    // Отписка не нужна — скруббер живёт ровно пока feed-body в DOM, при draw()
+    // оба пересоздаются (старый обработчик быстро no-op'ит через isConnected).
+
+    requestAnimationFrame(updateFromScroll);
+    return scrubber;
   }
 
   // Свайп листает неделю (в недельном виде).
@@ -893,7 +1115,7 @@ export function renderSchedule(mount, params, router) {
     // Отображение (что в окне — один день или вся неделя).
     content.appendChild(h('<div class="settings__label">Отображение</div>'));
     const segDM = h('<div class="segmented"></div>');
-    for (const key of ['day', 'week']) {
+    for (const key of ['day', 'week', 'feed']) {
       const chip = h(`<button class="seg${get.displayMode() === key ? ' seg--on' : ''}">${DISPLAY_MODE_LABELS[key]}</button>`);
       chip.addEventListener('click', async () => {
         hapticSelection();
