@@ -3,19 +3,19 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=41';
+} from './api.js?v=42';
 import {
   formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails,
   MONTHS_GENITIVE, MONTHS_NOMINATIVE, WEEKDAYS_SHORT,
-} from './constants.js?v=41';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=41';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=41';
-import { applyTheme } from './theme.js?v=41';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=41';
+} from './constants.js?v=42';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=42';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather } from './store.js?v=42';
+import { applyTheme } from './theme.js?v=42';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=42';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=41';
+} from './render.js?v=42';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -593,6 +593,9 @@ export function renderSchedule(mount, params, router) {
     const isWeek = displayMode === 'week';
     const isFeed = displayMode === 'feed';
 
+    // Класс на самой секции — режим feed включает sticky-шапку (CSS).
+    screen.classList.toggle('schedule--feed', isFeed);
+
     // Баннер режима преподавателя — отличает от своего расписания.
     if (isTeacher) {
       const banner = h(`
@@ -617,7 +620,12 @@ export function renderSchedule(mount, params, router) {
       ? weatherBadge(weatherForDate(get.weather(), selected)) : null;
     top.appendChild(headerWeather || h('<span></span>'));
     const right = h('<div class="sched-top__right"></div>');
-    if (!isToday && todayInRange) {
+    // В режимах day/week «Сегодня» показываем только когда смотрим не на
+    // сегодня. В feed-режиме selected не меняется при скролле (это просто
+    // якорь автоскролла), поэтому isToday остаётся true — кнопка должна
+    // быть видна всегда, пока сегодня в диапазоне.
+    const showTodayBtn = todayInRange && (isFeed || !isToday);
+    if (showTodayBtn) {
       const todayBtn = h('<button class="today-btn">Сегодня</button>');
       todayBtn.addEventListener('click', goToday);
       right.appendChild(todayBtn);

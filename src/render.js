@@ -3,7 +3,7 @@
 
 import {
   LECTURE_TYPES, WEATHER_ICONS, WEEKDAYS_SHORT, WEEKDAYS_FULL, MONTHS_GENITIVE,
-} from './constants.js?v=41';
+} from './constants.js?v=42';
 
 // --- DOM/утилиты ---
 function h(html) {
@@ -68,16 +68,29 @@ export function renderLesson(lesson, layout, viewMode = 'group') {
   return renderBlock(lesson, viewMode);
 }
 
-// Блочный (дефолт): карточка с цветной левой полосой и бейджем типа.
+// Блочный (дефолт): карточка с цветной левой полосой. Структура:
+//   время · номер
+//   название предмета
+//   📍 аудитория          тип
+//   преподаватель/группа
+// Аудитория слева — обычным текстом (var(--text)), тип справа — мелким
+// (как ФИО), для экзамена цвет amber, чтобы выделялся.
 function renderBlock(lesson, viewMode) {
   const { label, kind } = lessonTypeInfo(lesson.lessontype);
+  // kind для экзамена сейчас 'other' (lessonTypeInfo): отдельный класс
+  // lesson__type--exam добавляем здесь, чтобы экзамен подсвечивался amber.
+  const isExam = (lesson.lessontype || '').toLowerCase() === 'экзамен';
   const meta = metaLine(lesson, viewMode);
   const card = h(`
     <button class="lesson lesson--block kind-${kind}">
       <div class="lesson__time">${lesson.pair ? `${lesson.pair}-я пара · ` : ''}${esc(lesson.start)} — ${esc(lesson.end)}</div>
       <div class="lesson__title">${esc(lesson.subject)}</div>
-      <div class="lesson__badge-row"><span class="badge badge--${kind}">${esc(label)}</span></div>
-      ${lesson.room ? `<div class="lesson__room"><span class="lesson__room-icon">📍</span><span class="lesson__room-text">${esc(lesson.room)}</span></div>` : ''}
+      <div class="lesson__row">
+        ${lesson.room
+          ? `<span class="lesson__room"><span class="lesson__room-icon">📍</span><span class="lesson__room-text">${esc(lesson.room)}</span></span>`
+          : '<span class="lesson__room-placeholder"></span>'}
+        <span class="lesson__type lesson__type--${kind}${isExam ? ' lesson__type--exam' : ''}">${esc(label.toLowerCase())}</span>
+      </div>
       ${meta ? `<div class="lesson__meta">${esc(meta)}</div>` : ''}
     </button>
   `);
