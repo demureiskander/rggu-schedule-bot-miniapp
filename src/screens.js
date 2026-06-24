@@ -3,20 +3,20 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=44';
+} from './api.js?v=45';
 import {
   formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails,
   MONTHS_GENITIVE, MONTHS_NOMINATIVE, WEEKDAYS_SHORT, WEEKDAYS_FULL,
   instituteAbbr, instituteName, instituteIcon,
-} from './constants.js?v=44';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=44';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather, setAttendanceCell } from './store.js?v=44';
-import { applyTheme } from './theme.js?v=44';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=44';
+} from './constants.js?v=45';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=45';
+import { set, get, getFreshSchedule, setScheduleFor, setWeather, setAttendanceCell } from './store.js?v=45';
+import { applyTheme } from './theme.js?v=45';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=45';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
-  counterText, weatherBadge, weatherForDate, lessonDetail,
-} from './render.js?v=44';
+  counterText, weatherBadge, weatherForDate, lessonDetail, lessonTypeInfo,
+} from './render.js?v=45';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -1465,10 +1465,18 @@ function buildStudentBlock(group, router) {
 function buildExamsBlock(schedule) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const exams = [];
+  // Дедуп по subject|date|teacher: один экзамен часто стоит как две пары
+  // подряд (двойной слот). Аудитория из ключа исключена — в данных она
+  // может различаться (но это всё равно один экзамен).
+  const seen = new Set();
   for (const dateKey of schedule.dates) {
     const ts = dateKeyToTs(dateKey);
     for (const l of schedule.byDate[dateKey] || []) {
-      if (isExamLike(l.lessontype)) exams.push({ dateKey, ts, lesson: l });
+      if (!isExamLike(l.lessontype)) continue;
+      const key = `${l.subject}|${dateKey}|${l.teacher || ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      exams.push({ dateKey, ts, lesson: l });
     }
   }
   exams.sort((a, b) => a.ts - b.ts);
@@ -1542,7 +1550,7 @@ function buildStatsBlock(schedule) {
   const breakdownParts = [
     np(lectures, ['лекция', 'лекции', 'лекций']),
     np(seminars, ['семинар', 'семинара', 'семинаров']),
-    np(examsZachet, ['экзамен/зачёт', 'экзамена/зачёта', 'экзаменов/зачётов']),
+    np(examsZachet, ['экзамен', 'экзамена', 'экзаменов']),
   ];
 
   return h(`
@@ -1582,15 +1590,17 @@ function buildAttendanceBlock(schedule) {
   const todayTs = today.getTime();
 
   // Группируем все даты по предмету (без экзаменов/зачётов).
+  // Значение в Map по dateKey — { ts, lessontype } — нужно, чтобы рядом с
+  // датой показывать «· лекция / · семинар». Если в один день предмета
+  // несколько пар, берём тип первой.
   const bySubject = new Map();
   for (const dateKey of schedule.dates) {
     const ts = dateKeyToTs(dateKey);
     for (const l of schedule.byDate[dateKey] || []) {
       if (isExamLike(l.lessontype)) continue;
       if (!bySubject.has(l.subject)) bySubject.set(l.subject, new Map());
-      // Map по dateKey, чтобы исключить дубли в один день (две пары одного предмета).
       const dayMap = bySubject.get(l.subject);
-      if (!dayMap.has(dateKey)) dayMap.set(dateKey, ts);
+      if (!dayMap.has(dateKey)) dayMap.set(dateKey, { ts, lessontype: l.lessontype });
     }
   }
 
@@ -1608,18 +1618,73 @@ function buildAttendanceBlock(schedule) {
   }
 
   const attendance = get.attendance();
+
+  // Общая сводка по всем предметам: N посещений из M прошедших дат с парами.
+  // Tultip справа — поясняет что считается. Если нет ни одной отметки —
+  // вместо процента fallback-сообщение.
+  const summary = h(`
+    <div class="attend-summary">
+      <div class="attend-summary__row">
+        <span class="attend-summary__label">Общая посещаемость</span>
+        <span class="attend-summary__value-wrap">
+          <strong class="attend-summary__value"></strong>
+          <button class="info-tip" aria-label="Что это значит?">ℹ️</button>
+        </span>
+      </div>
+      <div class="progress"><div class="progress__bar attend-summary__bar"></div></div>
+      <div class="attend-summary__hint muted"></div>
+    </div>
+  `);
+  attachTip(summary.querySelector('.info-tip'),
+    'На основе ваших отметок о посещении.');
+  card.appendChild(summary);
+
+  const summaryValueEl = summary.querySelector('.attend-summary__value');
+  const summaryBarEl = summary.querySelector('.attend-summary__bar');
+  const summaryHintEl = summary.querySelector('.attend-summary__hint');
+
+  // Состояние посещаемости держим в одной структуре, чтобы переключение
+  // статуса конкретной ячейки обновляло и общую сводку.
+  const liveData = {}; // { subject: { dateKey: { status, ... } } }
+  for (const s of bySubject.keys()) liveData[s] = { ...(attendance[s] || {}) };
+
+  function refreshSummary() {
+    let totalPast = 0, totalPresent = 0, totalMarked = 0;
+    for (const [subject, dayMap] of bySubject.entries()) {
+      const sd = liveData[subject] || {};
+      for (const [dateKey, info] of dayMap.entries()) {
+        if (info.ts >= todayTs) continue;
+        totalPast++;
+        const status = sd[dateKey]?.status;
+        if (status === 'present') totalPresent++;
+        if (status === 'present' || status === 'absent') totalMarked++;
+      }
+    }
+    if (totalMarked === 0) {
+      summaryValueEl.textContent = '—';
+      summaryBarEl.style.width = '0%';
+      summaryHintEl.textContent = 'Отметьте посещение чтобы увидеть статистику.';
+    } else {
+      const pct = totalPast > 0 ? Math.round((totalPresent / totalPast) * 100) : 0;
+      summaryValueEl.textContent = `${pct}%`;
+      summaryBarEl.style.width = `${pct}%`;
+      summaryHintEl.textContent = `Посетил ${totalPresent} из ${totalPast}.`;
+    }
+  }
+  refreshSummary();
+
   const list = h('<div class="attend-list"></div>');
 
   // Сортируем по алфавиту имени предмета.
   const subjects = [...bySubject.keys()].sort((a, b) => a.localeCompare(b, 'ru'));
 
   for (const subject of subjects) {
-    const dates = [...bySubject.get(subject).entries()].sort((a, b) => a[1] - b[1]);
-    // [ [dateKey, ts], ... ]
-    const subjectData = attendance[subject] || {};
+    const dates = [...bySubject.get(subject).entries()].sort((a, b) => a[1].ts - b[1].ts);
+    // dates: [ [dateKey, {ts, lessontype}], ... ]
+    const subjectData = liveData[subject];
     const presentCount = dates.reduce((s, [k]) =>
       s + (subjectData[k]?.status === 'present' ? 1 : 0), 0);
-    const pastCount = dates.filter(([, ts]) => ts < todayTs).length;
+    const pastCount = dates.filter(([, info]) => info.ts < todayTs).length;
 
     const item = h(`
       <div class="attend-item">
@@ -1641,15 +1706,16 @@ function buildAttendanceBlock(schedule) {
       head.setAttribute('aria-expanded', String(open));
     });
 
-    // Рендерим строки дат (лениво, чтобы не плодить DOM до открытия? Оставим
-    // eager — типично 10-30 дат на предмет, не критично).
-    for (const [dateKey, ts] of dates) {
-      const d = new Date(ts);
-      const isFuture = ts > todayTs;
+    // Рендерим строки дат. Eager-рендер — обычно 10-30 дат на предмет.
+    for (const [dateKey, info] of dates) {
+      const d = new Date(info.ts);
+      const isFuture = info.ts > todayTs;
       const cell = subjectData[dateKey] || {};
+      const typeLabel = lessonTypeInfo(info.lessontype).label.toLowerCase();
+      const dateLine = `${shortDate(d)}${typeLabel ? ' · ' + typeLabel : ''}`;
       const row = h(`
         <div class="attend-row${isFuture ? ' attend-row--future' : ''}">
-          <span class="attend-row__date">${esc(shortDate(d))}</span>
+          <span class="attend-row__date">${esc(dateLine)}</span>
           ${isFuture
             ? '<span class="attend-row__future-mark muted">впереди</span>'
             : `<button class="attend-status attend-status--${cell.status || 'none'}" aria-label="Сменить статус">
@@ -1671,6 +1737,7 @@ function buildAttendanceBlock(schedule) {
           const newPresent = dates.reduce((s, [k]) =>
             s + (subjectData[k]?.status === 'present' ? 1 : 0), 0);
           counterEl.textContent = `Посетил ${newPresent} из ${pastCount}`;
+          refreshSummary();
         });
       }
       body.appendChild(row);

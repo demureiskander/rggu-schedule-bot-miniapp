@@ -1256,3 +1256,23 @@ h2 { font-size: 20px; }
 .attend-status--present { border-color: rgba(34,197,94,0.45); background: rgba(34,197,94,0.12); }
 .attend-status--absent  { border-color: rgba(239,68,68,0.45); background: rgba(239,68,68,0.12); }
 .attend-status--none    { color: var(--text-dim); }
+
+/* Сводка посещаемости сверху раздела: текущий процент + прогресс-бар + ℹ️ */
+.attend-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-bottom: var(--sp-3);
+  margin-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+.attend-summary__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.attend-summary__label { font-size: 14px; color: var(--text); }
+.attend-summary__value-wrap { display: inline-flex; align-items: center; gap: 4px; }
+.attend-summary__value { color: var(--amber); font-weight: 700; font-size: 15px; }
+.attend-summary__hint { font-size: 12px; }
