@@ -1348,13 +1348,31 @@ h2 { font-size: 20px; }
   font-size: 12px;
 }
 
-/* ── Ribbon: компактнее, без больших отступов; заголовок в одну строку
-      рядом с «от разработчика». ── */
+/* ── Ribbon: внешний контейнер mirror-ит .lesson--ribbon (flex с осью 40px
+      слева), карточка-плашка с акцентной полосой — внутри. ── */
 .banner--ribbon {
-  padding: 10px 12px 10px 14px;
-  gap: 4px;
-  border-radius: 10px;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 0;
   margin-top: 0;
+}
+/* .ribbon__axis в баннере — пустая колонка для выравнивания по ribbon-парам.
+   Сам .ribbon__axis уже стилизован (width: 40px, flex-shrink: 0). */
+.banner--ribbon .ribbon__axis::after { content: ''; }
+.banner__card {
+  flex: 1;
+  min-width: 0;
+  background: rgba(245, 158, 11, 0.08);
+  border-left: 3px solid var(--banner-color, var(--amber));
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .banner--ribbon .banner__from {
   text-transform: none;
@@ -1369,6 +1387,7 @@ h2 { font-size: 20px; }
 .banner--ribbon .banner__body {
   font-size: 12px;
   margin-top: 2px;
+  color: var(--text-muted);
 }
 
 /* ── Compact: одна строка точка/текст/pill/✕. ── */

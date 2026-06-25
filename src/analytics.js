@@ -1,7 +1,7 @@
 // Аналитика + sync + баннеры. Все вызовы беззвучно глотают ошибки —
 // аналитика никогда не должна ломать приложение.
 
-import { API_BASE } from '../config.js?v=52';
+import { API_BASE } from '../config.js?v=53';
 
 function getInitData() {
   try { return window.Telegram?.WebApp?.initData || ''; }

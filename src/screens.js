@@ -3,24 +3,24 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=52';
+} from './api.js?v=53';
 import {
   formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails,
   MONTHS_GENITIVE, MONTHS_NOMINATIVE, WEEKDAYS_SHORT, WEEKDAYS_FULL,
   instituteAbbr, instituteName, instituteIcon,
-} from './constants.js?v=52';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=52';
+} from './constants.js?v=53';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=53';
 import {
   set, get, getFreshSchedule, setScheduleFor, setWeather, setAttendanceCell,
   dismissBanner,
-} from './store.js?v=52';
-import { trackEvent, fetchBanners } from './analytics.js?v=52';
-import { applyTheme } from './theme.js?v=52';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=52';
+} from './store.js?v=53';
+import { trackEvent, fetchBanners } from './analytics.js?v=53';
+import { applyTheme } from './theme.js?v=53';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=53';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail, lessonTypeInfo,
-} from './render.js?v=52';
+} from './render.js?v=53';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -859,16 +859,21 @@ export function renderSchedule(mount, params, router) {
         </div>
       `);
     } else if (variant === 'ribbon') {
-      // Левая акцентная полоса (как у ribbon-карточек) + шапка «от … · title»,
-      // тело (опц.), маленькая pill справа, ✕ сверху.
+      // Та же flex-структура, что и .lesson--ribbon: пустая ось 40px слева
+      // (чтобы баннер выровнялся по ribbon-карточкам пар), потом card с
+      // левой акцентной полосой banner.color. Внутри card: шапка «от … · title»,
+      // body (опц.), маленькая pill, ✕ — всё компактно.
       card = h(`
         <div class="banner banner--ribbon" style="--banner-color:${esc(colorBar)}">
-          <div class="banner__top">
-            <span class="banner__from muted">от разработчика · <span class="banner__title">${esc(banner.title || '')}</span></span>
-            ${closeBtn}
+          <div class="ribbon__axis"></div>
+          <div class="banner__card">
+            <div class="banner__top">
+              <span class="banner__from muted">от разработчика · <span class="banner__title">${esc(banner.title || '')}</span></span>
+              ${closeBtn}
+            </div>
+            ${banner.body ? `<div class="banner__body">${esc(banner.body)}</div>` : ''}
+            ${banner.btn_text ? `<button class="banner__btn banner__btn--inline">${esc(banner.btn_text)}</button>` : ''}
           </div>
-          ${banner.body ? `<div class="banner__body">${esc(banner.body)}</div>` : ''}
-          ${banner.btn_text ? `<button class="banner__btn banner__btn--inline">${esc(banner.btn_text)}</button>` : ''}
         </div>
       `);
     } else {
