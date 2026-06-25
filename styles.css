@@ -1338,3 +1338,76 @@ h2 { font-size: 20px; }
 }
 .banner__btn:hover { filter: brightness(1.06); }
 .banner__btn:active { transform: scale(0.97); filter: brightness(0.92); }
+
+/* Маленькая inline-pill вариант кнопки — для ribbon/compact, чтоб не
+   занимала отдельную строку. */
+.banner__btn--inline {
+  align-self: center;
+  margin-top: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* ── Ribbon: компактнее, без больших отступов; заголовок в одну строку
+      рядом с «от разработчика». ── */
+.banner--ribbon {
+  padding: 10px 12px 10px 14px;
+  gap: 4px;
+  border-radius: 10px;
+  margin-top: 0;
+}
+.banner--ribbon .banner__from {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  font-weight: 500;
+}
+.banner--ribbon .banner__title {
+  font-size: 13px;
+  font-weight: 700;
+}
+.banner--ribbon .banner__body {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* ── Compact: одна строка точка/текст/pill/✕. ── */
+.banner--compact {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  box-shadow: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 12px 0;
+  margin-top: 0;
+}
+.banner--compact .banner__dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--banner-color, var(--amber));
+  flex-shrink: 0;
+}
+.banner--compact .banner__line {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+.banner--compact .banner__from {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.banner--compact .banner__title {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

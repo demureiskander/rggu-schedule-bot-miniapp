@@ -3,24 +3,24 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=51';
+} from './api.js?v=52';
 import {
   formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails,
   MONTHS_GENITIVE, MONTHS_NOMINATIVE, WEEKDAYS_SHORT, WEEKDAYS_FULL,
   instituteAbbr, instituteName, instituteIcon,
-} from './constants.js?v=51';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=51';
+} from './constants.js?v=52';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=52';
 import {
   set, get, getFreshSchedule, setScheduleFor, setWeather, setAttendanceCell,
   dismissBanner,
-} from './store.js?v=51';
-import { trackEvent, fetchBanners } from './analytics.js?v=51';
-import { applyTheme } from './theme.js?v=51';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=51';
+} from './store.js?v=52';
+import { trackEvent, fetchBanners } from './analytics.js?v=52';
+import { applyTheme } from './theme.js?v=52';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=52';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail, lessonTypeInfo,
-} from './render.js?v=51';
+} from './render.js?v=52';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -769,7 +769,7 @@ export function renderSchedule(mount, params, router) {
     }
     body.appendChild(list);
     // Один баннер после последней карточки дня (если есть активные).
-    if (activeBanners.length) body.appendChild(buildBannerCard(activeBanners[0]));
+    if (activeBanners.length) body.appendChild(buildBannerCard(activeBanners[0], layout));
   }
 
   // Недельный режим отображения: 7 дней друг под другом, шапки + список пар
@@ -820,7 +820,7 @@ export function renderSchedule(mount, params, router) {
     }
     body.appendChild(wrap);
     // Один баннер после последнего дня недели.
-    if (activeBanners.length) body.appendChild(buildBannerCard(activeBanners[0]));
+    if (activeBanners.length) body.appendChild(buildBannerCard(activeBanners[0], layout));
 
     // Тап по дате в полоске → скроллим к блоку выбранного дня. Откладываем на
     // следующий кадр, чтобы DOM успел смонтироваться (block:start учитывает
@@ -833,21 +833,58 @@ export function renderSchedule(mount, params, router) {
     }
   }
 
-  // Инлайн-карточка баннера. type=donate/link/info определяет действие
-  // по кнопке; крестик опционально (banner.dismissable).
-  function buildBannerCard(banner) {
+  // Инлайн-карточка баннера. Вёрстка адаптируется под layout:
+  //   block   — полный «парящий» блок (заголовок + текст + кнопка-pill)
+  //   ribbon  — компактная строка с акцентной точкой/полосой слева,
+  //             одна строка-шапка + body, маленькая inline-pill
+  //   compact — минимум: точка, заголовок, inline-pill, ✕ — всё в одну строку
+  // type=donate/link/info определяет действие по кнопке.
+  // crest опционально (banner.dismissable).
+  function buildBannerCard(banner, layout = 'block') {
     const colorBar = banner.color || '#F59E0B';
-    const card = h(`
-      <div class="banner" style="--banner-color:${esc(colorBar)}">
-        <div class="banner__top">
-          <span class="banner__from muted">от разработчика</span>
-          ${banner.dismissable ? '<button class="banner__close" aria-label="Закрыть">✕</button>' : ''}
+    const variant = layout === 'compact' ? 'compact' : layout === 'ribbon' ? 'ribbon' : 'block';
+    const closeBtn = banner.dismissable ? '<button class="banner__close" aria-label="Закрыть">✕</button>' : '';
+    let card;
+    if (variant === 'compact') {
+      // Одна строка: точка · «от разработчика — заголовок» · pill · ✕
+      card = h(`
+        <div class="banner banner--compact" style="--banner-color:${esc(colorBar)}">
+          <span class="banner__dot"></span>
+          <span class="banner__line">
+            <span class="banner__from muted">от разработчика</span>
+            <span class="banner__title">${esc(banner.title || '')}</span>
+          </span>
+          ${banner.btn_text ? `<button class="banner__btn banner__btn--inline">${esc(banner.btn_text)}</button>` : ''}
+          ${closeBtn}
         </div>
-        <div class="banner__title">${esc(banner.title || '')}</div>
-        ${banner.body ? `<div class="banner__body">${esc(banner.body)}</div>` : ''}
-        ${banner.btn_text ? `<button class="banner__btn">${esc(banner.btn_text)}</button>` : ''}
-      </div>
-    `);
+      `);
+    } else if (variant === 'ribbon') {
+      // Левая акцентная полоса (как у ribbon-карточек) + шапка «от … · title»,
+      // тело (опц.), маленькая pill справа, ✕ сверху.
+      card = h(`
+        <div class="banner banner--ribbon" style="--banner-color:${esc(colorBar)}">
+          <div class="banner__top">
+            <span class="banner__from muted">от разработчика · <span class="banner__title">${esc(banner.title || '')}</span></span>
+            ${closeBtn}
+          </div>
+          ${banner.body ? `<div class="banner__body">${esc(banner.body)}</div>` : ''}
+          ${banner.btn_text ? `<button class="banner__btn banner__btn--inline">${esc(banner.btn_text)}</button>` : ''}
+        </div>
+      `);
+    } else {
+      // block: «парящая» карточка как раньше.
+      card = h(`
+        <div class="banner banner--block" style="--banner-color:${esc(colorBar)}">
+          <div class="banner__top">
+            <span class="banner__from muted">от разработчика</span>
+            ${closeBtn}
+          </div>
+          <div class="banner__title">${esc(banner.title || '')}</div>
+          ${banner.body ? `<div class="banner__body">${esc(banner.body)}</div>` : ''}
+          ${banner.btn_text ? `<button class="banner__btn">${esc(banner.btn_text)}</button>` : ''}
+        </div>
+      `);
+    }
     const btn = card.querySelector('.banner__btn');
     if (btn) {
       btn.addEventListener('click', () => {
@@ -927,7 +964,7 @@ export function renderSchedule(mount, params, router) {
       if (activeBanners.length) {
         const banner = activeBanners[feedBannerState.idx % activeBanners.length];
         if (feedBannerState.counter >= (banner.frequency || 5)) {
-          curMonthDays.appendChild(buildBannerCard(banner));
+          curMonthDays.appendChild(buildBannerCard(banner, layout));
           feedBannerState.counter = 0;
           feedBannerState.idx++;
         }
