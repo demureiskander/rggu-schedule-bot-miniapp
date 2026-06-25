@@ -1045,7 +1045,13 @@ h2 { font-size: 20px; }
 /* ============================================================
    Экран «Профиль»: блоки «Студент / Экзамены / Статистика / Посещаемость»
    ============================================================ */
-.profile { padding-top: var(--sp-3); gap: var(--sp-6); }
+.profile {
+  padding-top: var(--sp-3);
+  /* Внизу — большой отступ, чтобы последний предмет в посещаемости
+     не упирался в край viewport (учитываем safe-area iOS). */
+  padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  gap: var(--sp-6);
+}
 .profile-head {
   display: flex;
   align-items: center;

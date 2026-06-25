@@ -581,7 +581,7 @@ function adminDashboardHTML(token) {
   .nav a { margin-right: 16px; }
 </style>
 </head><body>
-<div class="nav"><a href="?token=${encodeURIComponent(token)}">Dashboard</a><a href="banners?token=${encodeURIComponent(token)}">Banners</a><a href="users?token=${encodeURIComponent(token)}">Users</a></div>
+<div class="nav"><a href="/admin?token=${encodeURIComponent(token)}">Dashboard</a><a href="/admin/banners?token=${encodeURIComponent(token)}">Banners</a><a href="/admin/users?token=${encodeURIComponent(token)}">Users</a></div>
 <h1>РсухСпейс — Dashboard</h1>
 <div id="root">Loading…</div>
 <script>
@@ -662,7 +662,7 @@ function adminBannersHTML(token) {
   th, td { padding: 8px 6px; border-bottom: 1px solid var(--border); text-align: left; }
 </style>
 </head><body>
-<div class="nav"><a href="?token=${encodeURIComponent(token)}">Dashboard</a><a href="banners?token=${encodeURIComponent(token)}">Banners</a><a href="users?token=${encodeURIComponent(token)}">Users</a></div>
+<div class="nav"><a href="/admin?token=${encodeURIComponent(token)}">Dashboard</a><a href="/admin/banners?token=${encodeURIComponent(token)}">Banners</a><a href="/admin/users?token=${encodeURIComponent(token)}">Users</a></div>
 <h1>Баннеры</h1>
 <div class="card" id="form-card">
   <h2 style="font-size:14px;color:var(--muted);margin-bottom:12px">Новый баннер</h2>
@@ -781,7 +781,7 @@ function adminUsersHTML(token) {
   button { background: var(--amber); color: #1a1340; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 700; }
 </style>
 </head><body>
-<div class="nav"><a href="?token=${encodeURIComponent(token)}">Dashboard</a><a href="banners?token=${encodeURIComponent(token)}">Banners</a><a href="users?token=${encodeURIComponent(token)}">Users</a></div>
+<div class="nav"><a href="/admin?token=${encodeURIComponent(token)}">Dashboard</a><a href="/admin/banners?token=${encodeURIComponent(token)}">Banners</a><a href="/admin/users?token=${encodeURIComponent(token)}">Users</a></div>
 <h1>Юзеры</h1>
 <div class="card">
   <table><thead><tr><th>user_id</th><th>группа</th><th>отметок</th><th>last sync</th></tr></thead><tbody id="rows"></tbody></table>

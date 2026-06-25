@@ -3,24 +3,24 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=48';
+} from './api.js?v=50';
 import {
   formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails,
   MONTHS_GENITIVE, MONTHS_NOMINATIVE, WEEKDAYS_SHORT, WEEKDAYS_FULL,
   instituteAbbr, instituteName, instituteIcon,
-} from './constants.js?v=48';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=48';
+} from './constants.js?v=50';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=50';
 import {
   set, get, getFreshSchedule, setScheduleFor, setWeather, setAttendanceCell,
   dismissBanner,
-} from './store.js?v=48';
-import { trackEvent, fetchBanners } from './analytics.js?v=48';
-import { applyTheme } from './theme.js?v=48';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=48';
+} from './store.js?v=50';
+import { trackEvent, fetchBanners } from './analytics.js?v=50';
+import { applyTheme } from './theme.js?v=50';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=50';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail, lessonTypeInfo,
-} from './render.js?v=48';
+} from './render.js?v=50';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -438,17 +438,30 @@ export function renderSchedule(mount, params, router) {
   async function load() {
     screen.innerHTML = '';
     fab.el.classList.add('fab--gone');
+
+    // Быстрый путь: для своей группы — если кэш свежий и валидный, рисуем
+    // СРАЗУ, без сети и без try/catch. Возврат из профиля / поиска препода
+    // часто попадает сюда — раньше мы заходили в catch на любую транзитную
+    // ошибку сети (renderError на ровном месте).
+    if (!isTeacher) {
+      const cached = getFreshSchedule(group.id);
+      if (isValidSchedule(cached)) {
+        schedule = cached;
+        selected = pickInitialDate(cached);
+        ensureWeather();
+        draw();
+        return;
+      }
+    }
+
     screen.appendChild(mascotBlock({ pose: 'think', title: 'Загружаю расписание…', spinner: true }));
     try {
       let data;
       if (isTeacher) {
         data = await fetchTeacherSchedule(teacher.id);
       } else {
-        data = getFreshSchedule(group.id);
-        if (!isValidSchedule(data)) {
-          data = await fetchSchedule(group.id, group.form, group.year);
-          setScheduleFor(group.id, data);
-        }
+        data = await fetchSchedule(group.id, group.form, group.year);
+        setScheduleFor(group.id, data);
       }
       schedule = data;
       selected = pickInitialDate(data);
@@ -556,13 +569,25 @@ export function renderSchedule(mount, params, router) {
     if (today.getTime() < min || today.getTime() > max) return;
     haptic('light');
     if (get.displayMode() === 'feed') {
+      // Сначала пробуем точно сегодня. Если такого блока в DOM нет (сегодня —
+      // выходной без пар, его нет в schedule.dates → нет feed-day), скроллим
+      // к ближайшему будущему дню, который реально отрисован.
       const todayKey = tsToDateKey(today);
-      const block = document.querySelector(`.feed-day[data-date-key="${todayKey}"]`);
+      let block = document.querySelector(`.feed-day[data-date-key="${CSS.escape ? CSS.escape(todayKey) : todayKey}"]`);
+      if (!block) {
+        const ts = today.getTime();
+        const nextKey = schedule.dates.find((k) => dateKeyToTs(k) >= ts) || schedule.dates[schedule.dates.length - 1];
+        if (nextKey) {
+          block = document.querySelector(`.feed-day[data-date-key="${CSS.escape ? CSS.escape(nextKey) : nextKey}"]`);
+        }
+      }
       if (block) {
         block.scrollIntoView({ behavior: 'smooth', block: 'start' });
         selected = today;
         return;
       }
+      // Блока вообще нет — фолбэк на полную перерисовку с автоскроллом.
+      feedAutoscrolled = false;
     }
     nextDirection = 'fade';
     selected = today;
@@ -1094,11 +1119,15 @@ export function renderSchedule(mount, params, router) {
     }, { passive: true });
   }
 
-  // Погода: один раз за сессию, только если включена.
-  async function ensureWeather() {
+  // Погода: один раз за сессию, только если включена. Fire-and-forget с
+  // явным .catch — не должна ронять загрузку расписания. Раньше вызывалась
+  // без await: rejection становился unhandled, в Telegram WebApp это иногда
+  // ловится и считается ошибкой контекста.
+  function ensureWeather() {
     if (!get.weatherEnabled() || get.weather()) return;
-    const w = await fetchWeather();
-    if (w) { setWeather(w); if (schedule) draw(); }
+    fetchWeather()
+      .then((w) => { if (w) { setWeather(w); if (schedule) draw(); } })
+      .catch(() => { /* swallow — погода опциональна */ });
   }
 
   // Сводка по предмету (из загруженного расписания = весь семестр):
@@ -1619,6 +1648,9 @@ function buildStatsBlock(schedule) {
   let total = 0, remaining = 0;
   let lectures = 0, seminars = 0, examsZachet = 0;
   let daysWithLessons = 0, daysPassed = 0;
+  // Тот же дедуп, что и в buildExamsBlock — два слота на один экзамен
+  // (двойная пара) считаются одной записью.
+  const examsSeen = new Set();
   for (const dateKey of schedule.dates) {
     const ts = dateKeyToTs(dateKey);
     const lessons = schedule.byDate[dateKey] || [];
@@ -1630,8 +1662,10 @@ function buildStatsBlock(schedule) {
       total++;
       if (ts >= today.getTime()) remaining++;
       const t = (l.lessontype || '').toLowerCase();
-      if (isExamLike(l.lessontype)) examsZachet++;
-      else if (t.includes('лек')) lectures++;
+      if (isExamLike(l.lessontype)) {
+        const k = `${l.subject}|${dateKey}|${l.teacher || ''}`;
+        if (!examsSeen.has(k)) { examsSeen.add(k); examsZachet++; }
+      } else if (t.includes('лек')) lectures++;
       else if (t.includes('сем')) seminars++;
     }
   }
