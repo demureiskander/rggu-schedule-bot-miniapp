@@ -3,24 +3,24 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=47';
+} from './api.js?v=48';
 import {
   formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails,
   MONTHS_GENITIVE, MONTHS_NOMINATIVE, WEEKDAYS_SHORT, WEEKDAYS_FULL,
   instituteAbbr, instituteName, instituteIcon,
-} from './constants.js?v=47';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=47';
+} from './constants.js?v=48';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=48';
 import {
   set, get, getFreshSchedule, setScheduleFor, setWeather, setAttendanceCell,
   dismissBanner,
-} from './store.js?v=47';
-import { trackEvent, fetchBanners } from './analytics.js?v=47';
-import { applyTheme } from './theme.js?v=47';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=47';
+} from './store.js?v=48';
+import { trackEvent, fetchBanners } from './analytics.js?v=48';
+import { applyTheme } from './theme.js?v=48';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=48';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail, lessonTypeInfo,
-} from './render.js?v=47';
+} from './render.js?v=48';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',

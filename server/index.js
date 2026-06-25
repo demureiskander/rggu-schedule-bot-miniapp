@@ -586,8 +586,10 @@ function adminDashboardHTML(token) {
 <div id="root">Loading…</div>
 <script>
   const TOKEN = ${t};
+  // Абсолютный путь '/admin/api/…' — относительный 'api/' от страницы '/admin'
+  // резолвится в '/api/…' (без префикса /admin), и dashboard ходил мимо ручек.
   async function api(p) {
-    const r = await fetch('api/' + p + '?token=' + encodeURIComponent(TOKEN));
+    const r = await fetch('/admin/api/' + p + '?token=' + encodeURIComponent(TOKEN));
     return r.json();
   }
   function el(t,a={},c='') { const e=document.createElement(t); Object.assign(e,a); if(c)e.innerHTML=c; return e; }
@@ -696,7 +698,7 @@ function adminBannersHTML(token) {
 <script>
   const TOKEN = ${t};
   async function api(p, opt={}) {
-    const url = 'api/' + p + '?token=' + encodeURIComponent(TOKEN);
+    const url = '/admin/api/' + p + '?token=' + encodeURIComponent(TOKEN);
     const r = await fetch(url, opt);
     return r.json();
   }
@@ -789,7 +791,7 @@ function adminUsersHTML(token) {
   const TOKEN = ${t};
   let offset = 0; const LIMIT = 50;
   async function load() {
-    const r = await fetch('api/users?token=' + encodeURIComponent(TOKEN) + '&limit=' + LIMIT + '&offset=' + offset);
+    const r = await fetch('/admin/api/users?token=' + encodeURIComponent(TOKEN) + '&limit=' + LIMIT + '&offset=' + offset);
     const json = await r.json();
     const users = json.users || [];
     const rows = users.map(u => '<tr><td>'+u.user_id+'</td><td>'+(u.group_label||'')+'</td><td>'+u.attendance_marks+'</td><td>'+(u.updated_at||'')+'</td></tr>').join('');
