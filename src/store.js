@@ -2,12 +2,12 @@
 // Persistence: Telegram CloudStorage (синхронизируется между устройствами) с
 // fallback на localStorage. В памяти держим текущее состояние и кэш расписания.
 
-import { cloudGet, cloudSet, hasCloudStorage } from './telegram.js?v=45';
+import { cloudGet, cloudSet, hasCloudStorage } from './telegram.js?v=47';
 
 const LS_PREFIX = 'rsuhspace:';
 
 // Ключи, которые персистим.
-const PERSIST_KEYS = ['group', 'layout', 'displayMode', 'theme', 'weatherEnabled', 'highlightEmptyDays', 'attendance'];
+const PERSIST_KEYS = ['group', 'layout', 'displayMode', 'theme', 'weatherEnabled', 'highlightEmptyDays', 'attendance', 'dismissed_banners'];
 
 // Ключи, реально найденные в хранилище при loadState (для «первого запуска»).
 const persistedKeys = new Set();
@@ -27,6 +27,9 @@ const state = {
   // Хранится в CloudStorage (4KB лимит на ключ — для типичных 10–15 предметов
   // помещается), c зеркалом в localStorage. JSON-сериализация.
   attendance: {},
+  // ID баннеров, которые юзер закрыл крестиком. Шлём на сервер при
+  // /api/banners — чтобы их не возвращало.
+  dismissed_banners: [],
 
   // Сессионное (не персистим):
   schedule: null,         // { byDate: { 'ДД.ММ.ГГГГ': [lesson...] }, dates: [...], fetchedAt }
@@ -67,13 +70,13 @@ async function writePersisted(key, value) {
 // --- сериализация значений ---
 
 function serialize(key, value) {
-  if (key === 'group' || key === 'attendance') return JSON.stringify(value);
+  if (key === 'group' || key === 'attendance' || key === 'dismissed_banners') return JSON.stringify(value);
   return String(value);
 }
 
 function deserialize(key, raw) {
   if (raw == null) return undefined;
-  if (key === 'group' || key === 'attendance') {
+  if (key === 'group' || key === 'attendance' || key === 'dismissed_banners') {
     try { return JSON.parse(raw); } catch (_) { return undefined; }
   }
   if (key === 'weatherEnabled' || key === 'highlightEmptyDays') return raw === 'true';
@@ -128,7 +131,17 @@ export const get = {
   schedule: () => state.schedule,
   weather: () => state.weather,
   attendance: () => state.attendance || {},
+  dismissedBanners: () => Array.isArray(state.dismissed_banners) ? state.dismissed_banners : [],
 };
+
+// Добавить ID баннера в список закрытых (дедуп). Сразу пишется в persistence.
+export async function dismissBanner(id) {
+  const cur = new Set(Array.isArray(state.dismissed_banners) ? state.dismissed_banners : []);
+  cur.add(Number(id));
+  state.dismissed_banners = [...cur];
+  persistedKeys.add('dismissed_banners');
+  await writePersisted('dismissed_banners', JSON.stringify(state.dismissed_banners));
+}
 
 // Точечный апдейт посещаемости: одна ячейка [subject][dateKey] = {status, note?}.
 // Передан null/undefined как status — запись удаляется. Сразу пишется в store
@@ -146,6 +159,32 @@ export async function setAttendanceCell(subject, dateKey, status, note) {
   state.attendance = att;
   persistedKeys.add('attendance');
   await writePersisted('attendance', JSON.stringify(att));
+  notifyDataChanged();
+}
+
+// — Зеркало state на сервер (debounced). Хук вызывается из setAttendanceCell,
+// set('group'|'displayMode'|'layout'|'theme'). Реализация (analytics.scheduleSync)
+// прокидывается через registerSyncHook в main.js — store сам не импортирует
+// analytics, чтобы не создавать циклический import.
+let onDataChanged = null;
+export function registerSyncHook(fn) { onDataChanged = fn; }
+function notifyDataChanged() {
+  if (!onDataChanged) return;
+  try { onDataChanged(buildSyncSnapshot()); } catch (_) {}
+}
+function buildSyncSnapshot() {
+  return {
+    attendance: state.attendance || {},
+    group_id: state.group?.id || null,
+    group_label: state.group ? `${state.group.name}${state.group.details ? ' · ' + state.group.details : ''}` : null,
+    settings: {
+      displayMode: state.displayMode,
+      layout: state.layout,
+      theme: state.theme,
+      weatherEnabled: state.weatherEnabled,
+      highlightEmptyDays: state.highlightEmptyDays,
+    },
+  };
 }
 
 // Устанавливает персистентное поле и сохраняет его.
@@ -156,6 +195,35 @@ export async function set(key, value) {
   state[key] = value;
   persistedKeys.add(key);
   await writePersisted(key, serialize(key, value));
+  // dismissed_banners в зеркале не нужен — у каждого юзера свой локальный список.
+  if (key !== 'dismissed_banners') notifyDataChanged();
+}
+
+// Применить снимок с сервера (restoreFromServer) к state. Записывает в
+// persistence через стандартный writePersisted — отсюда зеркалится в обе
+// бочки (Cloud + LS). Вызывается main.js при пустом локальном state.
+export async function applyServerSnapshot(snap) {
+  if (!snap) return;
+  if (snap.attendance && Object.keys(snap.attendance).length) {
+    state.attendance = snap.attendance;
+    persistedKeys.add('attendance');
+    await writePersisted('attendance', JSON.stringify(snap.attendance));
+  }
+  const s = snap.settings || {};
+  for (const k of ['displayMode', 'layout', 'theme']) {
+    if (s[k] != null && PERSIST_KEYS.includes(k)) {
+      state[k] = s[k];
+      persistedKeys.add(k);
+      await writePersisted(k, serialize(k, s[k]));
+    }
+  }
+  for (const k of ['weatherEnabled', 'highlightEmptyDays']) {
+    if (typeof s[k] === 'boolean') {
+      state[k] = s[k];
+      persistedKeys.add(k);
+      await writePersisted(k, serialize(k, s[k]));
+    }
+  }
 }
 
 // --- Кэш расписания на сессию (по группе, инвалидация после ~22:30 МСК) ---

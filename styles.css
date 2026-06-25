@@ -1276,3 +1276,59 @@ h2 { font-size: 20px; }
 .attend-summary__value-wrap { display: inline-flex; align-items: center; gap: 4px; }
 .attend-summary__value { color: var(--amber); font-weight: 700; font-size: 15px; }
 .attend-summary__hint { font-size: 12px; }
+
+/* ============================================================
+   Баннеры от разработчика — инлайн-карточка в потоке расписания.
+   Левая полоса банер.color, фон чуть теплее обычных карточек.
+   ============================================================ */
+.banner {
+  position: relative;
+  background: rgba(245, 158, 11, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px 14px 16px;
+  box-shadow: inset 4px 0 0 var(--banner-color, var(--amber));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.banner__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.banner__from {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.banner__close {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.banner__close:active { background: var(--surface-2); }
+.banner__title { font-size: 15px; font-weight: 700; color: var(--text); }
+.banner__body { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
+.banner__btn {
+  align-self: flex-start;
+  margin-top: 4px;
+  background: var(--banner-color, var(--amber));
+  color: #1A1530;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 80ms ease;
+}
+.banner__btn:hover { filter: brightness(1.06); }
+.banner__btn:active { transform: scale(0.97); filter: brightness(0.92); }

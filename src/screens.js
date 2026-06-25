@@ -3,20 +3,24 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=45';
+} from './api.js?v=47';
 import {
   formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails,
   MONTHS_GENITIVE, MONTHS_NOMINATIVE, WEEKDAYS_SHORT, WEEKDAYS_FULL,
   instituteAbbr, instituteName, instituteIcon,
-} from './constants.js?v=45';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=45';
-import { set, get, getFreshSchedule, setScheduleFor, setWeather, setAttendanceCell } from './store.js?v=45';
-import { applyTheme } from './theme.js?v=45';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=45';
+} from './constants.js?v=47';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=47';
+import {
+  set, get, getFreshSchedule, setScheduleFor, setWeather, setAttendanceCell,
+  dismissBanner,
+} from './store.js?v=47';
+import { trackEvent, fetchBanners } from './analytics.js?v=47';
+import { applyTheme } from './theme.js?v=47';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=47';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail, lessonTypeInfo,
-} from './render.js?v=45';
+} from './render.js?v=47';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -207,11 +211,17 @@ function renderPickerCourse(mount, params, router) {
 // Сохраняет выбранную группу и переходит на расписание.
 async function commitGroup(params, flow, router) {
   haptic('light');
+  const prev = get.group();
   const group = {
     form: params.form, year: params.course,
     id: flow.id, name: flow.name, details: flow.details,
   };
   await set('group', group);
+  trackEvent('group_change', {
+    from: prev?.id || null,
+    to: group.id,
+    name: group.name,
+  });
   router.reset('schedule', { group });
 }
 
@@ -395,6 +405,18 @@ export function renderSchedule(mount, params, router) {
 
   let schedule = null;
   let selected = null; // Date
+  // Список активных баннеров для интеграции в поток расписания. Загружается
+  // один раз на сессию после render(). До этого — пустой массив, баннеры
+  // просто не показываются.
+  let activeBanners = [];
+  // Только для своей группы — в teacher-режиме баннеры не нужны.
+  if (!isTeacher) {
+    fetchBanners(get.dismissedBanners()).then((b) => {
+      if (!b || !b.length) return;
+      activeBanners = b;
+      if (schedule) draw();
+    });
+  }
   // Направление мягкой анимации тела при следующем draw():
   //   'forward'  — приехать справа (день/неделя вперёд)
   //   'backward' — приехать слева (день/неделя назад)
@@ -721,6 +743,8 @@ export function renderSchedule(mount, params, router) {
       list.appendChild(el);
     }
     body.appendChild(list);
+    // Один баннер после последней карточки дня (если есть активные).
+    if (activeBanners.length) body.appendChild(buildBannerCard(activeBanners[0]));
   }
 
   // Недельный режим отображения: 7 дней друг под другом, шапки + список пар
@@ -770,6 +794,8 @@ export function renderSchedule(mount, params, router) {
       wrap.appendChild(dayBlock);
     }
     body.appendChild(wrap);
+    // Один баннер после последнего дня недели.
+    if (activeBanners.length) body.appendChild(buildBannerCard(activeBanners[0]));
 
     // Тап по дате в полоске → скроллим к блоку выбранного дня. Откладываем на
     // следующий кадр, чтобы DOM успел смонтироваться (block:start учитывает
@@ -781,6 +807,51 @@ export function renderSchedule(mount, params, router) {
       });
     }
   }
+
+  // Инлайн-карточка баннера. type=donate/link/info определяет действие
+  // по кнопке; крестик опционально (banner.dismissable).
+  function buildBannerCard(banner) {
+    const colorBar = banner.color || '#F59E0B';
+    const card = h(`
+      <div class="banner" style="--banner-color:${esc(colorBar)}">
+        <div class="banner__top">
+          <span class="banner__from muted">от разработчика</span>
+          ${banner.dismissable ? '<button class="banner__close" aria-label="Закрыть">✕</button>' : ''}
+        </div>
+        <div class="banner__title">${esc(banner.title || '')}</div>
+        ${banner.body ? `<div class="banner__body">${esc(banner.body)}</div>` : ''}
+        ${banner.btn_text ? `<button class="banner__btn">${esc(banner.btn_text)}</button>` : ''}
+      </div>
+    `);
+    const btn = card.querySelector('.banner__btn');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        haptic('light');
+        trackEvent('banner_click', { banner_id: banner.id, type: banner.type });
+        if (banner.type === 'donate') {
+          openTelegramLink('https://t.me/RsuhSpaceBot?start=coffee');
+        } else if (banner.type === 'link' && banner.btn_url) {
+          openLink(banner.btn_url);
+        }
+      });
+    }
+    const close = card.querySelector('.banner__close');
+    if (close) {
+      close.addEventListener('click', async () => {
+        haptic('light');
+        trackEvent('banner_dismiss', { banner_id: banner.id });
+        await dismissBanner(banner.id);
+        activeBanners = activeBanners.filter((b) => b.id !== banner.id);
+        card.remove();
+      });
+    }
+    return card;
+  }
+
+  // Состояние для ротации баннеров в feed-режиме.
+  // bannerCounter — сколько карточек пар прошло с последнего показа.
+  // bannerIdx — следующий индекс в activeBanners (циклически).
+  const feedBannerState = { counter: 0, idx: 0 };
 
   // --- Режим «Лента»: сплошной скролл по всему семестру ---
   function drawFeed(layout) {
@@ -797,6 +868,8 @@ export function renderSchedule(mount, params, router) {
     const feed = h('<div class="feed"></div>');
     let curMonthKey = null;
     let curMonthDays = null;
+    // Сбрасываем состояние ротации на каждую отрисовку (draw пересоздаёт DOM).
+    feedBannerState.counter = 0;
     for (const dateKey of schedule.dates) {
       const d = new Date(dateKeyToTs(dateKey));
       const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
@@ -812,6 +885,18 @@ export function renderSchedule(mount, params, router) {
         feed.appendChild(monthBlock);
       }
       curMonthDays.appendChild(buildFeedDay(d, dateKey, todayKey, forecast, layout));
+      // Учёт частоты баннеров: набираем счётчик карточек по дню, и если
+      // перевалили за frequency следующего баннера — вставляем баннер.
+      const dayLessons = schedule.byDate[dateKey] || [];
+      feedBannerState.counter += dayLessons.length;
+      if (activeBanners.length) {
+        const banner = activeBanners[feedBannerState.idx % activeBanners.length];
+        if (feedBannerState.counter >= (banner.frequency || 5)) {
+          curMonthDays.appendChild(buildBannerCard(banner));
+          feedBannerState.counter = 0;
+          feedBannerState.idx++;
+        }
+      }
     }
     body.appendChild(feed);
 
@@ -1138,7 +1223,9 @@ export function renderSchedule(mount, params, router) {
       const chip = h(`<button class="seg${get.displayMode() === key ? ' seg--on' : ''}">${DISPLAY_MODE_LABELS[key]}</button>`);
       chip.addEventListener('click', async () => {
         hapticSelection();
+        const prev = get.displayMode();
         await set('displayMode', key);
+        if (prev !== key) trackEvent('mode_change', { mode: key, prev });
         segDM.querySelectorAll('.seg').forEach((c) => c.classList.remove('seg--on'));
         chip.classList.add('seg--on');
         draw();
@@ -1176,7 +1263,10 @@ export function renderSchedule(mount, params, router) {
     // Deep link с параметром coffee: бот ловит /start coffee и сразу
     // открывает оплату Stars'ами. Mini App при этом закрывается — пользователь
     // оказывается в чате с ботом, и обработка идёт уже на стороне бота.
-    support.appendChild(linkRow('⭐', 'Telegram Stars', '', () => openTelegramLink('https://t.me/RsuhSpaceBot?start=coffee')));
+    support.appendChild(linkRow('⭐', 'Telegram Stars', '', () => {
+      trackEvent('donate_click', { source: 'settings' });
+      openTelegramLink('https://t.me/RsuhSpaceBot?start=coffee');
+    }));
     support.appendChild(linkRow('💳', 'Cloudtips', 'рублями по СБП', () => openLink('https://pay.cloudtips.ru/p/b5c9b884')));
     content.appendChild(support);
 
@@ -1366,6 +1456,7 @@ export function renderProfile(mount, params, router) {
   mount.appendChild(screen);
 
   let schedule = null;
+  trackEvent('profile_open', { group: group.id });
   load();
 
   async function load() {

@@ -1,9 +1,10 @@
 // Точка входа: инициализация SDK/темы/persistence + стек-роутер экранов.
 
-import { initWebApp, onBackButton, setBackVisible } from './telegram.js?v=45';
-import { loadState, get } from './store.js?v=45';
-import { applyTheme, resolveInitialTheme } from './theme.js?v=45';
-import * as screens from './screens.js?v=45';
+import { initWebApp, onBackButton, setBackVisible } from './telegram.js?v=47';
+import { loadState, get, registerSyncHook, applyServerSnapshot, isPersisted } from './store.js?v=47';
+import { applyTheme, resolveInitialTheme } from './theme.js?v=47';
+import { trackEvent, scheduleSync, restoreFromServer } from './analytics.js?v=47';
+import * as screens from './screens.js?v=47';
 
 const appEl = document.getElementById('app');
 
@@ -68,14 +69,30 @@ async function start() {
 
   await loadState();
 
+  // Если в локальном хранилище нет ни группы, ни attendance — пробуем
+  // восстановить снимок с сервера (новое устройство / переустановка).
+  if (!isPersisted('group') && !isPersisted('attendance')) {
+    try {
+      const snap = await restoreFromServer();
+      if (snap) await applyServerSnapshot(snap);
+    } catch (_) { /* swallow */ }
+  }
+
+  // Регистрируем sync-хук — store сам не зависит от analytics.
+  registerSyncHook((snapshot) => scheduleSync(snapshot));
+
   // Тема из единого источника (store) до первого рендера контента.
   applyTheme(resolveInitialTheme());
 
   // Системный BackButton: сперва закрыть открытый sheet, иначе навигация назад.
   onBackButton(() => { if (!screens.handleBack()) router.back(); });
 
-  // Стартовый экран: валидная сохранённая группа — сразу расписание, иначе приветствие.
+  // Стартовый экран + событие app_open.
   const group = get.group();
+  trackEvent('app_open', {
+    group: group?.id || null,
+    mode: get.displayMode(),
+  });
   if (isValidGroup(group)) router.reset('schedule', { group });
   else router.reset('welcome');
 }
