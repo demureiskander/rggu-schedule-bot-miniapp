@@ -3,24 +3,24 @@
 import {
   fetchFlows, fetchSchedule, fetchTeacherSchedule, fetchTeachers,
   fetchWeather, tsToDateKey, dateKeyToTs,
-} from './api.js?v=50';
+} from './api.js?v=51';
 import {
   formGroups, COURSES, MASCOT, GROUP_FORMS, formatFormCode, buildTree, splitDetails,
   MONTHS_GENITIVE, MONTHS_NOMINATIVE, WEEKDAYS_SHORT, WEEKDAYS_FULL,
   instituteAbbr, instituteName, instituteIcon,
-} from './constants.js?v=50';
-import { APP_VERSION, BOT_USERNAME } from '../config.js?v=50';
+} from './constants.js?v=51';
+import { APP_VERSION, BOT_USERNAME } from '../config.js?v=51';
 import {
   set, get, getFreshSchedule, setScheduleFor, setWeather, setAttendanceCell,
   dismissBanner,
-} from './store.js?v=50';
-import { trackEvent, fetchBanners } from './analytics.js?v=50';
-import { applyTheme } from './theme.js?v=50';
-import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=50';
+} from './store.js?v=51';
+import { trackEvent, fetchBanners } from './analytics.js?v=51';
+import { applyTheme } from './theme.js?v=51';
+import { haptic, hapticSelection, setBackVisible, openLink, openTelegramLink } from './telegram.js?v=51';
 import {
   renderLesson, weekStrip, dayNav, weekNav, weekMonday, weekDayHeader,
   counterText, weatherBadge, weatherForDate, lessonDetail, lessonTypeInfo,
-} from './render.js?v=50';
+} from './render.js?v=51';
 
 const LAYOUT_LABELS = {
   block: 'Блочный', compact: 'Компакт.', ribbon: 'Ленточный',
@@ -895,7 +895,17 @@ export function renderSchedule(mount, params, router) {
     let curMonthDays = null;
     // Сбрасываем состояние ротации на каждую отрисовку (draw пересоздаёт DOM).
     feedBannerState.counter = 0;
-    for (const dateKey of schedule.dates) {
+    // В schedule.dates только дни с парами. «Сегодня» может быть выходным —
+    // его там нет, и тогда в ленте не было блока «сегодня» (нечего подсветить,
+    // нечего автоскроллить). Добавляем сегодня в список, если оно в пределах
+    // семестра — отрендерится как пустой блок с amber-заголовком.
+    const datesForFeed = [...schedule.dates];
+    const { min, max } = rangeBounds();
+    if (today.getTime() >= min && today.getTime() <= max && !schedule.byDate[todayKey]) {
+      datesForFeed.push(todayKey);
+      datesForFeed.sort((a, b) => dateKeyToTs(a) - dateKeyToTs(b));
+    }
+    for (const dateKey of datesForFeed) {
       const d = new Date(dateKeyToTs(dateKey));
       const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
       if (monthKey !== curMonthKey) {
@@ -934,8 +944,15 @@ export function renderSchedule(mount, params, router) {
     if (!feedAutoscrolled) {
       feedAutoscrolled = true;
       requestAnimationFrame(() => {
-        const target = feed.querySelector(`.feed-day[data-date-key="${todayKey}"]`)
-          || feed.querySelector('.feed-day');
+        // Точное сегодня → ближайший будущий день из schedule.dates →
+        // первый feed-day в семестре. Раньше fallback сразу шёл в начало
+        // семестра — и при открытии ленту автоскроллило в осень.
+        let target = feed.querySelector(`.feed-day[data-date-key="${todayKey}"]`);
+        if (!target) {
+          const futureKey = schedule.dates.find((k) => dateKeyToTs(k) >= today.getTime());
+          if (futureKey) target = feed.querySelector(`.feed-day[data-date-key="${futureKey}"]`);
+        }
+        if (!target) target = feed.querySelector('.feed-day');
         if (target) target.scrollIntoView({ block: 'start', behavior: 'auto' });
       });
     } else if (nextScrollToSelected) {
@@ -954,7 +971,9 @@ export function renderSchedule(mount, params, router) {
     const lessons = schedule.byDate[dateKey] || [];
     const isTodayDay = dateKey === todayKey;
     const empty = lessons.length === 0;
-    const cls = `feed-day${isTodayDay ? ' feed-day--today' : ''}${empty && get.highlightEmptyDays() ? ' feed-day--empty' : ''}`;
+    // Сегодня не приглушаем, даже если без пар — иначе amber-заголовок
+    // выглядит выцветшим.
+    const cls = `feed-day${isTodayDay ? ' feed-day--today' : ''}${empty && get.highlightEmptyDays() && !isTodayDay ? ' feed-day--empty' : ''}`;
     const block = h(`<div class="${cls}" data-date-key="${esc(dateKey)}"></div>`);
     const title = `${WEEKDAYS_SHORT[date.getDay()]}, ${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()]}`;
     const head = h(`<div class="feed-day__head"><span class="feed-day__title">${esc(title)}</span></div>`);
